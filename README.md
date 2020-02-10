@@ -6,7 +6,7 @@ The MEI score is synthesised to MIDI using [Verovio](https://verovio.org). The r
 
 The result of this reconciliation is stored in the MAPS output format, from where it can be converted to RDF for use in CLARA. 
 
-Further documentation to come -- below notes are provisional and not necessarily suitable for public consumption! For futher information contact weigl at mdw.ac.at
+Further documentation to come -- ***below notes are provisional and not necessarily suitable for public consumption!*** For futher information contact weigl at mdw.ac.at
 
 
 ****
