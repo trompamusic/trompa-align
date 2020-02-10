@@ -1,8 +1,8 @@
 # trompa-align
 
-This repository contains a collection of scripts that are used to align MIDI piano performances with MEI score encodings, converting the alignment information to Linked Data for use with the [https://github.com/trompamusic/clara](CLARA Companion for Long-term Analyses of Rehearsal Attempts). 
+This repository contains a collection of scripts that are used to align MIDI piano performances with MEI score encodings, converting the alignment information to Linked Data for use with the [CLARA Companion for Long-term Analyses of Rehearsal Attempts](https://github.com/trompamusic/clara). 
 
-The MEI score is synthesised to MIDI using [https://verovio.org](Verovio). The resulting MIDI file is then aligned with the performance MIDI using the [https://midialignment.github.io/demo.html](Symbolic Music Alignment Tool) by Nakamura et al. The MIDI-to-MIDI alignment is then reanchored within MEI using a [scripts/trompa-align.R](script) which attempts to reconcile timestamps and pitch heights determined in Verovio and Nakamura (corresp) output; this is not entirely trivial due to differences in precision and rounding between the two tools. 
+The MEI score is synthesised to MIDI using [Verovio](https://verovio.org). The resulting MIDI file is then aligned with the performance MIDI using the [Symbolic Music Alignment Tool](https://midialignment.github.io/demo.html) by Nakamura et al. The MIDI-to-MIDI alignment is then reanchored within MEI using a [script](scripts/trompa-align.R) which attempts to reconcile timestamps and pitch heights determined in Verovio and Nakamura (corresp) output; this is not entirely trivial due to differences in precision and rounding between the two tools. 
 
 The result of this reconciliation is stored in the MAPS output format, from where it can be converted to RDF for use in CLARA. 
 
