@@ -175,16 +175,16 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
     rdfs:member <{sectionId}> ;
     meld:notes {notes} ;
     meld:measures {measures} ;
-    meld:startsWith <{first}> ;
-    meld:endsWith <{last}> ] {endterm}
+    meld:startsWith {first} ;
+    meld:endsWith {last} ] {endterm}
     {before}
     {after}""".format(
         ix = ix,
         segUri = segUri,
         segId = seg,
         sectionId = meiUri + "#" + seg,
-        first = seg_data[seg]["first"],
-        last = seg_data[seg]["last"],
+        first = "<" + meiUri + "#" + seg_data[seg]["first"] + ">",
+        last = "<" + meiUri + "#" + seg_data[seg]["last"] + ">",
         # take this segment's map object for notes / measures built up in generate_structural_segmentation
         # convert it to a list
         # iterate through it decorating URI's with comma-separated <>
