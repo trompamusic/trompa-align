@@ -2,7 +2,7 @@
 
 args <- commandArgs(trailingOnly=TRUE)
 if(length(args) < 3 || length(args) > 4) {
-  print("Invoke as: Rscript trompa-align.R /path/to/corresp/dir /path/to/output/dir /path/to/MEI-file.mei {threshold-in-ms (default=5)}")
+  print("Invoke as: Rscript trompa-align.R /path/to/corresp/dir /path/to/output/dir http://URI-or-path.to/the/MEI-file.mei {threshold-in-ms (default=5)}")
   quit()
 }
 
@@ -14,6 +14,7 @@ library(fuzzyjoin) # for difference_inner_join
 library(reticulate) # to execute the Verovio python code
 library(glue) # for interpolated string niceness
 
+Sys.setenv(RETICULATE_PYTHON="/usr/bin/python")
 
 correspDir <- args[1] # where our corresp.txt files live
 outputDir <- args[2] # where our data files will be generated
@@ -23,6 +24,8 @@ if(length(args) == 3) {
 } else { 
   threshold <- args[4]
 }
+
+
 
 generateMapsResultJson <- function(correspFile, correspDir, outputDir) { # function to generate a MAPS result object from a corresp file
   correspFile <- paste0(correspDir, "/", correspFile)

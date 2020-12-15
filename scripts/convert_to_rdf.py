@@ -1,4 +1,5 @@
 import json, os, sys, argparse, csv, urllib.parse
+from uuid import uuid4
 from pprint import pprint
 from rdflib import Graph, plugin
 from rdflib.serializer import Serializer
@@ -14,6 +15,7 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
 @prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
 @prefix meld: <https://meld.linkedmusic.org/terms/> .
 @prefix maps: <https://terms.trompamusic.eu/maps#> .
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
@@ -40,6 +42,15 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
             else: 
                 term = ";"
             rdf += """ frbr:embodimentOf meiUri:{xml_id} {term}""".format(xml_id = xml_id, term=term)
+        # iterate through again to annotate velocities for each performed note
+        for ix3, velocity in enumerate(obs["velocity"]):
+            rdf += """<#velocity{uuid}> a oa:Annotation ; 
+    oa:motivatedBy oa:describing ;
+    oa:hasTarget <#target{uuid}> .
+<#target{uuid}> oa:hasScope <> ;
+    oa:hasSource meiUri:{xml_id} ;
+    oa:bodyValue "{velocity}" .\n""".format(uuid = str(uuid4()).replace("-", ""), xml_id = obs["xml_id"][ix3], velocity = velocity)
+
     return Graph().parse(data = rdf, format='n3')
 
 def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri, performancesUri, worksUri):
@@ -75,19 +86,16 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
 @prefix maps: <https://terms.trompamusic.eu/maps#> .
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
 @prefix mo: <http://purl.org/ontology/mo/> .
-@prefix perftl: <{perftl}/> .
-@prefix recording: <{recordingUri}/> .
-@prefix work: <{worksUri}/> .
 
 <{perfPath}/{performanceID}{formatPlaceholder}> a mo:Performance ;
-    mo:performance_of work:{pieceLabel}{formatPlaceholder} ;
+    mo:performance_of <{worksUri}/{pieceLabel}{formatPlaceholder}> ;
     mo:recorded_as <{perfPath}/{performanceID}{formatPlaceholder}#Signal> ;
     meld:offset "{offset}" ;
     rdfs:label "{firstName} {lastName} - {pieceLabel}" .
 
-<{perfPath}/{performanceID}{formatPlaceholder}#Signal> mo:available_as recording:{media} ;
+<{perfPath}/{performanceID}{formatPlaceholder}#Signal> mo:available_as <{recordingUri}/{media}> ;
     mo:time [ a tl:Interval ;
-    tl:onTimeLine perftl:{performanceID}{formatPlaceholder}
+    tl:onTimeLine <{perftl}/{performanceID}{formatPlaceholder}>
 ] .
 """.format( 
         perftl = tlUri,
@@ -161,12 +169,12 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
 @prefix meld: <https://meld.linkedmusic.org/terms/> .
 @prefix struct: <http://localhost:8080/structure/> .
 @prefix WoO80: <http://localhost:8080/segment/WoO80/> .
-@base <{segUri}> .
+@base <{segUri}{formatPlaceholder}> .
 
 <{meiUri}> a mo:PublishedScore .
 
 <> a so:SegmentLine .
-    """.format(segUri = segUri, meiUri = meiUri)
+    """.format(segUri = segUri, meiUri = meiUri, formatPlaceholder = formatPlaceholder)
     for ix, seg in enumerate(seg_data):
         rdf += """<#{segId}> a so:Segment ; 
     so:onSegmentLine <> ;
