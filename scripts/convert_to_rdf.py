@@ -116,7 +116,7 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
 
 
 def graph_to_jsonld(g):
-    return json.loads(g.serialize(format='json-ld').decode("utf8").replace(formatPlaceholder, ".json"))
+    return json.loads(g.serialize(format='json-ld').decode("utf8").replace(formatPlaceholder, ".jsonld"))
 
 def graph_to_turtle(g):
     n3String = g.serialize(format='n3').decode("utf8")
@@ -210,8 +210,8 @@ if __name__ == "__main__":
     parser.add_argument('--maps', '-m', help="Path to MAPS result file", required=False)
     parser.add_argument('--segmentlineUri', '-s', help="Score segmentline URI", required=False)
     parser.add_argument('--timelineUri', '-t', help="Performance timeline URI", required=False)
-    parser.add_argument('--format', '-f', help="Output format type (ttl, json, both)", required=True)
-    parser.add_argument('--timelineOutput', '-o', help="Performance timeline output file name (will be suffixed with .ttl or .json", required=False)
+    parser.add_argument('--format', '-f', help="Output format type (ttl, jsonld, both)", required=True)
+    parser.add_argument('--timelineOutput', '-o', help="Performance timeline output file name (will be suffixed with .ttl or .jsonld", required=False)
     parser.add_argument('--meiFile', '-e', help="If provided, generate a structural segmentation for the MEI file", required=False)
     parser.add_argument('--meiUri', '-u', help="MEI file URI", required=False)
     parser.add_argument('--segmentlineOutput', '-p', help="Structural segmentation output", required=False)
@@ -251,15 +251,15 @@ if __name__ == "__main__":
                     ttl_file.write(tlTtl)
                     print("Performance description (turtle) written: timeline/" + perf["performanceID"] + ".ttl")
 
-            if(outputFormat == 'json' or outputFormat == 'both'):
+            if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
                 perfJsonld = json.dumps(graph_to_jsonld(perf["performance"]), indent=2)
-                with open("performance/" + perf["performanceID"] + ".json", "w") as json_file:
+                with open("performance/" + perf["performanceID"] + ".jsonld", "w") as json_file:
                     json_file.write(perfJsonld)
-                    print("Performance description (json-ld) written: performance/" + perf["performanceID"] + ".json")
+                    print("Performance description (json-ld) written: performance/" + perf["performanceID"] + ".jsonld")
                 tlJsonld = json.dumps(graph_to_jsonld(perf["timeline"]), indent=2)
-                with open("timeline/" + perf["performanceID"] + ".json", "w") as json_file:
+                with open("timeline/" + perf["performanceID"] + ".jsonld", "w") as json_file:
                     json_file.write(tlJsonld)
-                    print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + ".json")
+                    print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + ".jsonld")
 
     elif fName is not None:
         # maps result file specified...
@@ -278,11 +278,11 @@ if __name__ == "__main__":
                     with open(outputFName + ".ttl", "w") as ttl_file:
                         ttl_file.write(ttl.decode("utf-8"))
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
-                if(outputFormat == 'json' or outputFormat == 'both'):
+                if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
                     jsonld = json.dumps(graph_to_jsonld(g), indent=2)
-                    with open(outputFName + ".json", "w") as json_file:
+                    with open(outputFName + ".jsonld", "w") as json_file:
                         json_file.write(jsonld)
-                        print("Performance timeline (json-ld) written: " + outputFName + ".json")
+                        print("Performance timeline (json-ld) written: " + outputFName + ".jsonld")
         else: 
             print("File does not exist: ", fName)
     if meiFile is not None:
@@ -296,8 +296,8 @@ if __name__ == "__main__":
             with open(segmentlineOutput+ ".ttl", "w") as ttl_file:
                 ttl_file.write(ttl)
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
-        if(outputFormat == 'json' or outputFormat == 'both'):
+        if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
             jsonld = json.dumps(graph_to_jsonld(g), indent=2)
-            with open(segmentlineOutput+ ".json", "w") as json_file:
+            with open(segmentlineOutput+ ".jsonld", "w") as json_file:
                 json_file.write(jsonld)
-                print("MEI score segmentation (json-ld) written: " + segmentlineOutput + ".json")
+                print("MEI score segmentation (json-ld) written: " + segmentlineOutput + ".jsonld")
