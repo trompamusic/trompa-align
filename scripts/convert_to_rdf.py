@@ -251,13 +251,14 @@ if __name__ == "__main__":
                     ttl_file.write(tlTtl)
                     print("Performance description (turtle) written: timeline/" + perf["performanceID"] + ".ttl")
 
-            if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
+            if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
+                extension = '' if outputFormat == 'tpl' else '.jsonld'
                 perfJsonld = json.dumps(graph_to_jsonld(perf["performance"]), indent=2)
-                with open("performance/" + perf["performanceID"] + ".jsonld", "w") as json_file:
+                with open("performance/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(perfJsonld)
                     print("Performance description (json-ld) written: performance/" + perf["performanceID"] + ".jsonld")
                 tlJsonld = json.dumps(graph_to_jsonld(perf["timeline"]), indent=2)
-                with open("timeline/" + perf["performanceID"] + ".jsonld", "w") as json_file:
+                with open("timeline/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(tlJsonld)
                     print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + ".jsonld")
 
@@ -278,9 +279,10 @@ if __name__ == "__main__":
                     with open(outputFName + ".ttl", "w") as ttl_file:
                         ttl_file.write(ttl.decode("utf-8"))
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
-                if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
+                if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
+                    extension = '' if outputFormat == 'tpl' else '.jsonld'
                     jsonld = json.dumps(graph_to_jsonld(g), indent=2)
-                    with open(outputFName + ".jsonld", "w") as json_file:
+                    with open(outputFName + extension, "w") as json_file:
                         json_file.write(jsonld)
                         print("Performance timeline (json-ld) written: " + outputFName + ".jsonld")
         else: 
@@ -296,8 +298,9 @@ if __name__ == "__main__":
             with open(segmentlineOutput+ ".ttl", "w") as ttl_file:
                 ttl_file.write(ttl)
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
-        if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both'):
+        if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
+            extension = '' if outputFormat == 'tpl' else '.jsonld'
             jsonld = json.dumps(graph_to_jsonld(g), indent=2)
-            with open(segmentlineOutput+ ".jsonld", "w") as json_file:
+            with open(segmentlineOutput+extension, "w") as json_file:
                 json_file.write(jsonld)
                 print("MEI score segmentation (json-ld) written: " + segmentlineOutput + ".jsonld")

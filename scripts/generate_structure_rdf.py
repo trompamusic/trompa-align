@@ -19,7 +19,7 @@ seglineOut = args.segmentlineOutput if args.segmentlineOutput.endswith(".jsonld"
 segmentlineUri = args.segmentlineHost + seglineOut if args.segmentlineHost.endswith("/") else args.segmentlineHost + "/" + seglineOut
 with open(args.tpl_out, 'w') as tplOut:
     tplOut.write("[tplout]\noutput=" + seglineOut)
-os.system("python {scriptsPath}/convert_to_rdf.py --format jsonld --meiFile {meiFile} --segmentlineOutput {seglineOut} --meiUri {meiUri} --segmentlineUri {segmentlineUri}"
+os.system("python {scriptsPath}/convert_to_rdf.py --format tpl --meiFile {meiFile} --segmentlineOutput {seglineOut} --meiUri {meiUri} --segmentlineUri {segmentlineUri}"
     .format(
         scriptsPath = sys.path[0],
         meiFile = args.meiFile, 
