@@ -15,9 +15,7 @@ Further documentation to come -- ***below notes are provisional and not necessar
 
 Install:
 * Rscript scripts/install-packages.R 
-* Build verovio with python hooks
-    - requires install of python-devel and swig, 
-* pip install rdflib rdflib-jsonld
+* pip install -r requirements.txt
 
 
 
