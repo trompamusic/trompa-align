@@ -9,10 +9,6 @@ parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to
 
 args = parser.parse_args()
 
-if args.meiFile is None or args.segmentlineOutput is None or args.meiUri is None or args.segmentlineHost is None or args.tpl_out is None:
-    sys.exit("")
-
-
 # ensure our output file neds in .jsonld
 seglineOut = args.segmentlineOutput if args.segmentlineOutput.endswith(".jsonld") else args.segmentlineOutput + ".jsonld"
 # build the URI for the generated file, inserting a slash if necessary

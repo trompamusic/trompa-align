@@ -210,11 +210,12 @@ if __name__ == "__main__":
     parser.add_argument('--maps', '-m', help="Path to MAPS result file", required=False)
     parser.add_argument('--segmentlineUri', '-s', help="Score segmentline URI", required=False)
     parser.add_argument('--timelineUri', '-t', help="Performance timeline URI", required=False)
-    parser.add_argument('--format', '-f', help="Output format type (ttl, jsonld, both)", required=True)
+    parser.add_argument('--format', '-f', help="Output format type (ttl, jsonld, both, tpl). tpl will generate a jsonld file without adding a .jsonld suffix to the filename.", required=True)
     parser.add_argument('--timelineOutput', '-o', help="Performance timeline output file name (will be suffixed with .ttl or .jsonld", required=False)
     parser.add_argument('--meiFile', '-e', help="If provided, generate a structural segmentation for the MEI file", required=False)
     parser.add_argument('--meiUri', '-u', help="MEI file URI", required=False)
     parser.add_argument('--segmentlineOutput', '-p', help="Structural segmentation output", required=False)
+    parser.add_argument('--solidClaraRoot', '-c', help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.", required=False)
     parser.add_argument('--performancesFile', '-P', help="Performance metadata TSV file", required=False)
     parser.add_argument('--performancesUri', '-q', help="Prefix URI for generated performances RDF", required=False)
     parser.add_argument('--recordingUri', '-r', help="URI of recorded media directory for these performances", required=False)
@@ -234,6 +235,16 @@ if __name__ == "__main__":
     performancesUri = args.performancesUri
     recordingUri = args.recordingUri
     worksUri = args.worksUri
+    solidClaraRoot = args.solidClaraRoot
+
+    if solidClaraRoot is not None:
+        solidClaraRoot = os.path.join(solidClaraRoot, "")
+        performanceUri = os.path.join(solidClaraRoot, "performance", outputFName)
+        tlUri = os.path.join(solidClaraRoot, "timeline", outputFName)
+    elif performanceUri is not None:
+        solidClaraRoot = os.path.dirname(performanceUri)
+    if recordingUri is None:
+        recordingUri = os.path.join(solidClaraRoot, "recording/")
 
     if performancesFile is not None:
         if segUri is None or meiUri is None or tlUri is None or recordingUri is None or performancesUri is None or worksUri is None:
@@ -256,11 +267,11 @@ if __name__ == "__main__":
                 perfJsonld = json.dumps(graph_to_jsonld(perf["performance"]), indent=2)
                 with open("performance/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(perfJsonld)
-                    print("Performance description (json-ld) written: performance/" + perf["performanceID"] + ".jsonld")
+                    print("Performance description (json-ld) written: performance/" + perf["performanceID"] + extension)
                 tlJsonld = json.dumps(graph_to_jsonld(perf["timeline"]), indent=2)
                 with open("timeline/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(tlJsonld)
-                    print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + ".jsonld")
+                    print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + extension)
 
     elif fName is not None:
         # maps result file specified...
@@ -284,7 +295,7 @@ if __name__ == "__main__":
                     jsonld = json.dumps(graph_to_jsonld(g), indent=2)
                     with open(outputFName + extension, "w") as json_file:
                         json_file.write(jsonld)
-                        print("Performance timeline (json-ld) written: " + outputFName + ".jsonld")
+                        print("Performance timeline (json-ld) written: " + outputFName + extension)
         else: 
             print("File does not exist: ", fName)
     if meiFile is not None:
@@ -303,4 +314,4 @@ if __name__ == "__main__":
             jsonld = json.dumps(graph_to_jsonld(g), indent=2)
             with open(segmentlineOutput+extension, "w") as json_file:
                 json_file.write(jsonld)
-                print("MEI score segmentation (json-ld) written: " + segmentlineOutput + ".jsonld")
+                print("MEI score segmentation (json-ld) written: " + segmentlineOutput + extension)

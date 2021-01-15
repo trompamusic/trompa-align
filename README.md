@@ -1,3 +1,41 @@
+TO INSTALL
+1. Rscript scripts/install-packages.R 
+2. pip install -r requirements.txt
+3. Install the Symbolic Music Alignment Tool (SMAT):
+    * Download the latest version (zip file) from https://midialignment.github.io/demo.html 
+    * Unzip it and store the absolute path as `SMAT_PATH`
+    * Compile it with: `cd SMAT_PATH; ./compile.sh`
+
+TO RUN (from the trompa-align directory)
+1. Prepare environmental variables. Set up:
+    `export SMAT_PATH=/path/to/SMAT` (as in installation step 3)
+    `export MEI_URI=http://uri.of.my/meiFile.mei` 
+    `export STRUCTURE_URI=http://uri.of.my/meiFile_structure.jsonld` (generated in a separate TPL task on ingest of a new MEI file to CE)
+    `export PERFORMANCE_MIDI=/path/to/performance.midi`
+    `export CANONICAL_MIDI=/path/to/canonical.midi` (file content generated in step 2)
+    `export CORRESP_FILE=/path/to/correspFile` (file content generated in step 3)
+    `export MAPS_FILE=/path/to/mapsFile` (file content generated in step 4)
+    `export LD_OUT=/path/to/timeline/rdf/outputFile.jsonld` (file content generated in step 5)
+    
+
+2. Generate canonical MIDI from web-hosted MEI: 
+  `python scripts/mei-to-midi.py --meiUri $MEI_URI --output $CANONICAL_MIDI`
+  
+3. Use SMAT to align the canonical MIDI with your performance MIDI, generating a corresp file:
+  
+  `python scripts/smat-align.py -s $SMAT_PATH -c $CANONICAL_MIDI -p $PERFORMANCE_MIDI -o $CORRESP_FILE`
+
+4. Perform MIDI-to-MEI reconciliation, yielding a MAPS file:
+
+  `Rscript scripts/trompa-align.R $CORRESP_FILE $MAPS_FILE $MEI_URI` 
+
+5. Convert the MAPS file to performance and timeline RDF
+
+  `python scripts/convert_to_rdf.py -m $MAPS_FILE -c $SOLID_ROOT -u $MEI_URI -f tpl -s $STRUCTURE_URI -o $LD_OUT` 
+
+
+
+
 # trompa-align
 
 This repository contains a collection of scripts that are used to align MIDI piano performances with MEI score encodings, converting the alignment information to Linked Data for use with the [CLARA Companion for Long-term Analyses of Rehearsal Attempts](https://github.com/trompamusic/clara). 
