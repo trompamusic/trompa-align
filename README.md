@@ -6,30 +6,39 @@ TO INSTALL
     * Unzip it and store the absolute path as `SMAT_PATH`
     * Compile it with: `cd SMAT_PATH; ./compile.sh`
 
-TO RUN (from the trompa-align directory)
-1. Prepare environmental variables. Set up:
-    `export SMAT_PATH=/path/to/SMAT` (as in installation step 3)
-    `export MEI_URI=http://uri.of.my/meiFile.mei` 
-    `export STRUCTURE_URI=http://uri.of.my/meiFile_structure.jsonld` (generated in a separate TPL task on ingest of a new MEI file to CE)
-    `export PERFORMANCE_MIDI=/path/to/performance.midi`
-    `export CANONICAL_MIDI=/path/to/canonical.midi` (file content generated in step 2)
-    `export CORRESP_FILE=/path/to/correspFile` (file content generated in step 3)
-    `export MAPS_FILE=/path/to/mapsFile` (file content generated in step 4)
-    `export LD_OUT=/path/to/timeline/rdf/outputFile.jsonld` (file content generated in step 5)
-    
+TO RUN
 
-2. Generate canonical MIDI from web-hosted MEI: 
+First, prepare environment variables:
+    `export SMAT_PATH=/local/path/to/SMAT` (as in installation step 3)
+    `export PERFORMANCE_MIDI=/local/path/to/performance.midi`
+    `export CANONICAL_MIDI=/local/path/to/canonical.midi` (file content generated in step 1: mei-to-midi)
+    `export CORRESP_FILE=/local/path/to/correspFile` (file content generated in step 2: SMAT-alignment)
+    `export MAPS_FILE=/local/path/to/mapsFile` (file content generated in step 3: MIDI-to-MEI reconciliation)
+    `export LD_OUT=/local/path/to/timeline/rdf/outputFile.jsonld` (file content generated in step 4: MAPS-to-RDF conversion)
+    `export MEI_URI=http://uri.of.my/meiFile.mei`  (URI of MEI file being performed)
+    `export STRUCTURE_URI=http://uri.of.my/meiFile_structure.jsonld` (generated in a separate TPL task on ingest of a new MEI file to CE)
+    `export SOLID_CLARA_BASE=http://users.solid.pod/path/to/clara.trompamusic.folder/` (URI of CLARA folder in user's Solid POD)
+    
+TO RUN THE FULL ALIGNMENT-WORKFLOW: (from the trompa-align root directory):
+
+`python scripts/performance_alignment_workflow.py --smatPath $SMAT_PATH --meiUri $MEI_URI --structureUri $STRUCTURE_URI --performanceMidi $PERFORMANCE_MIDI --timelineOutput $LD_OUT --solidClaraBaseUri $SOLID_CLARA_BASE`
+
+If successful, your output should be available at $LD_OUT. 
+
+TO RUN EACH STAGE OF THE WORKFLOW: (from the trompa-align root directory):
+
+1. Generate canonical MIDI from web-hosted MEI: 
   `python scripts/mei-to-midi.py --meiUri $MEI_URI --output $CANONICAL_MIDI`
   
-3. Use SMAT to align the canonical MIDI with your performance MIDI, generating a corresp file:
+2. Use SMAT to align the canonical MIDI with your performance MIDI, generating a corresp file:
   
   `python scripts/smat-align.py -s $SMAT_PATH -c $CANONICAL_MIDI -p $PERFORMANCE_MIDI -o $CORRESP_FILE`
 
-4. Perform MIDI-to-MEI reconciliation, yielding a MAPS file:
+3. Perform MIDI-to-MEI reconciliation, yielding a MAPS file:
 
   `Rscript scripts/trompa-align.R $CORRESP_FILE $MAPS_FILE $MEI_URI` 
 
-5. Convert the MAPS file to performance and timeline RDF
+4. Convert the MAPS file to performance and timeline RDF
 
   `python scripts/convert_to_rdf.py -m $MAPS_FILE -c $SOLID_ROOT -u $MEI_URI -f tpl -s $STRUCTURE_URI -o $LD_OUT` 
 
