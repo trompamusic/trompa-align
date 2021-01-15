@@ -223,27 +223,28 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    fName = args.maps
-    segUri = args.segmentlineUri
-    tlUri = args.timelineUri
-    outputFormat = args.format
-    outputFName = args.timelineOutput
-    meiFile = args.meiFile
-    segmentlineOutput = args.segmentlineOutput
-    meiUri = args.meiUri
-    performancesFile = args.performancesFile
-    performancesUri = args.performancesUri
-    recordingUri = args.recordingUri
-    worksUri = args.worksUri
-    solidClaraRoot = args.solidClaraRoot
+
+    fName = args.maps if "maps" in args else None
+    segUri = args.segmentlineUri if "segmentlineUri" in args else None
+    tlUri = args.timelineUri if "timelineUri" in args else None
+    outputFormat = args.format if "format" in args else None
+    outputFName = args.timelineOutput if "timelineOutput" in args else None
+    meiFile = args.meiFile if "meiFile" in args else None
+    segmentlineOutput = args.segmentlineOutput if "segmentlineOutput" in args else None
+    meiUri = args.meiUri if "meiUri" in args else None
+    performancesFile = args.performancesFile if "performancesFile" in args else None
+    performancesUri = args.performancesUri if "performancesUri" in args else None
+    recordingUri = args.recordingUri if "recordingUri" in args else None
+    worksUri = args.worksUri if "worksUri" in args else None
+    solidClaraRoot = args.solidClaraRoot if "solidClaraRoot" in args else None
 
     if solidClaraRoot is not None:
         solidClaraRoot = os.path.join(solidClaraRoot, "")
-        performanceUri = os.path.join(solidClaraRoot, "performance", outputFName)
+        performancesUri = os.path.join(solidClaraRoot, "performance", outputFName)
         tlUri = os.path.join(solidClaraRoot, "timeline", outputFName)
-    elif performanceUri is not None:
-        solidClaraRoot = os.path.dirname(performanceUri)
-    if recordingUri is None:
+    elif performancesUri is not None:
+        solidClaraRoot = os.path.dirname(performancesUri)
+    if recordingUri is None and solidClaraRoot is not None:
         recordingUri = os.path.join(solidClaraRoot, "recording/")
 
     if performancesFile is not None:
