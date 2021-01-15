@@ -115,8 +115,8 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
 
 
 
-def graph_to_jsonld(g):
-    return json.loads(g.serialize(format='json-ld').decode("utf8").replace(formatPlaceholder, ".jsonld"))
+def graph_to_jsonld(g, extension):
+    return json.loads(g.serialize(format='json-ld').decode("utf8").replace(formatPlaceholder, extension))
 
 def graph_to_turtle(g):
     n3String = g.serialize(format='n3').decode("utf8")
@@ -265,11 +265,11 @@ if __name__ == "__main__":
 
             if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
                 extension = '' if outputFormat == 'tpl' else '.jsonld'
-                perfJsonld = json.dumps(graph_to_jsonld(perf["performance"]), indent=2)
+                perfJsonld = json.dumps(graph_to_jsonld(perf["performance"], extension), indent=2)
                 with open("performance/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(perfJsonld)
                     print("Performance description (json-ld) written: performance/" + perf["performanceID"] + extension)
-                tlJsonld = json.dumps(graph_to_jsonld(perf["timeline"]), indent=2)
+                tlJsonld = json.dumps(graph_to_jsonld(perf["timeline"], extension), indent=2)
                 with open("timeline/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(tlJsonld)
                     print("Performance description (json-ld) written: timeline/" + perf["performanceID"] + extension)
@@ -293,7 +293,7 @@ if __name__ == "__main__":
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
                 if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
                     extension = '' if outputFormat == 'tpl' else '.jsonld'
-                    jsonld = json.dumps(graph_to_jsonld(g), indent=2)
+                    jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
                     with open(outputFName + extension, "w") as json_file:
                         json_file.write(jsonld)
                         print("Performance timeline (json-ld) written: " + outputFName + extension)
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
         if(outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
             extension = '' if outputFormat == 'tpl' else '.jsonld'
-            jsonld = json.dumps(graph_to_jsonld(g), indent=2)
+            jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
             with open(segmentlineOutput+extension, "w") as json_file:
                 json_file.write(jsonld)
                 print("MEI score segmentation (json-ld) written: " + segmentlineOutput + extension)
