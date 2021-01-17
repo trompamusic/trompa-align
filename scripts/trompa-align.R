@@ -72,7 +72,11 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   
   # add in the inserted notes:
   insertedExport <- insertedNotes %>% select(alignOntime, alignSitch, alignOnvel)
-  insertedExport$alignSitch <- paste0("trompa-align_inserted_", insertedExport$alignSitch)
+  # the inserted note is not in the score and so does not have an MEI (xml) ID
+  # use this field instead to store the spelled pitch of the inserted note
+  # but because we'll be using it as part of a Linked Data identifier later on in the workflow, replace "#" with "s"
+  # (so, e.g., C# becomes Cs)
+  insertedExport$alignSitch <- str_replace(paste0("trompa-align_inserted_", insertedExport$alignSitch), "#", "s")
   names(insertedExport) <- c("obs_mean_onset", "xml_id", "velocity")
   mapsExport <- rbind(mapsExport, insertedExport)
   
