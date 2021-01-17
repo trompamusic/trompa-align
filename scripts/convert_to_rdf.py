@@ -34,7 +34,7 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
         rdf += """tlUri:{ix} a tl:Instant ;
  tl:onTimeLine <> ;
  {confidence}{velocity}
- tl:atDuration "P{mean_onset}S" ; """.format(ix = ix, mean_onset = obs["obs_mean_onset"], confidence = confidence, velocity = velocity)
+ tl:at "P{mean_onset}S" ; """.format(ix = ix, mean_onset = obs["obs_mean_onset"], confidence = confidence, velocity = velocity)
         # iterate through each associated MEI identifier
         for ix2, xml_id in enumerate(obs["xml_id"]):
             if ix2 == len(obs["xml_id"])-1: 
