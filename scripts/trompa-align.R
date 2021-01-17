@@ -35,7 +35,7 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
                       skip=1,
                       col_names = c("alignID", "alignOntime", "alignSitch", 
                                     "alignPitch", "alignOnvel", "refID", "refOntime", 
-                                    "refSitch", "refPitch" "refOnvel", "ignoreMe")
+                                    "refSitch", "refPitch", "refOnvel", "ignoreMe")
   )
   
   # drop last column of corresp (artifact of bad TSV formatting)
