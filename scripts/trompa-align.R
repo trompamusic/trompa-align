@@ -15,7 +15,6 @@ library(reticulate) # to execute the Verovio python code
 library(glue) # for interpolated string niceness
 
 Sys.setenv(RETICULATE_PYTHON=Sys.which("python"))
-Sys.setenv(PYTHONPATH=Sys.which("python"))
 
 correspFile <- args[1] # where our corresp.txt files live
 outputFile <- args[2] # where our data files will be generated
@@ -28,7 +27,7 @@ if(length(args) == 3) {
 
 
 
-generateMapsResultJson <- function(correspFile, outputFile) { # function to generate a MAPS result object from a corresp file
+generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function to generate a MAPS result object from a corresp file
   print(paste("Processing", correspFile))
   correspRaw <- read_file(correspFile)
   correspString <- str_replace_all(correspRaw, "\\*", "-1")
@@ -36,26 +35,30 @@ generateMapsResultJson <- function(correspFile, outputFile) { # function to gene
                       skip=1,
                       col_names = c("alignID", "alignOntime", "alignSitch", 
                                     "alignPitch", "alignOnvel", "refID", "refOntime", 
-                                    "refSitch", "refPitch", "refOnvel", "ignoreMe")
+                                    "refSitch", "refPitch" "refOnvel", "ignoreMe")
   )
   
   # drop last column of corresp (artifact of bad TSV formatting)
   corresp <- select(corresp, -one_of("ignoreMe"))
   corresp <- mutate(corresp, tstamp = refOntime * 1000)
-  print("Merging")
   
-  merged <- difference_inner_join(corresp, attrs, by="tstamp",  max_dist = threshold, distance_col = "dist") %>%
+  # separate out inserted notes (i.e., performed notes that aren't in the score)
+  insertedNotes <- corresp %>% filter(refID == "-1")
+  
+  # the rest are notes that were aligned via SMAT
+  smatAlignedNotes <- setdiff(corresp, insertedNotes)
+  
+  
+  merged <- difference_inner_join(smatAlignedNotes, attrs, by="tstamp",  max_dist = threshold, distance_col = "dist") %>%
     filter(midiPitch == refPitch)
   
   # choose the candidate for each MEI note ID with most similar times
   matched <- group_by(merged, id)  %>% filter(rank(dist, ties.method="first") == 1)
-  head(matched)
   
-  diffs <- setdiff(corresp$refID, matched$refID)
-  onlycorresp <- filter(corresp, refID %in% diffs)
+  diffs <- setdiff(smatAlignedNotes$refID, matched$refID)
+  nonReconciliated<- filter(smatAlignedNotes, refID %in% diffs)
 
-  print(paste(nrow(onlycorresp), "match failures:"))
-  #print(onlycorresp)
+  print(paste(nrow(nonReconciliated), "match failures."))
   
   
   # for MAPS export:
@@ -66,6 +69,13 @@ generateMapsResultJson <- function(correspFile, outputFile) { # function to gene
     summarise(list(id), list(alignOnvel))
   head(mapsExport)
   names(mapsExport) <- c("obs_mean_onset", "xml_id", "velocity")
+  
+  # add in the inserted notes:
+  insertedExport <- insertedNotes %>% select(alignOntime, alignSitch, alignOnvel)
+  insertedExport$alignSitch <- paste0("trompa-align_inserted_", insertedExport$alignSitch)
+  names(insertedExport) <- c("obs_mean_onset", "xml_id", "velocity")
+  mapsExport <- rbind(mapsExport, insertedExport)
+  
   mapsExport$confidence <- 0
   mapsExport$obs_num <- as.numeric(rownames(mapsExport))
   mapsExportJson <- toJSON(mapsExport)
@@ -84,7 +94,7 @@ loadMeiIntoVerovioPython <- if(startsWith(meiFile, "http")) glue("
 # Python code to grab MIDI values from Verovio, in order to align corresp file with MEI note IDs
 generateAttrsPython <- glue("
 import verovio
-import json
+import json 
 import urllib.request
 
 tk = verovio.toolkit()
@@ -112,4 +122,4 @@ attrsJson <- py_run_string(generateAttrsPython)$allNotesJson
 attrs <- parse_json(attrsJson, simplifyVector = TRUE)
 
 # do the actual work
-generateMapsResultJson(correspFile, outputFile)
+generateMapsResultJson(correspFile, attrs, outputFile)
