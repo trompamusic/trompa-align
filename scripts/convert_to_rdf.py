@@ -41,15 +41,23 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
                 term = ".\n"
             else: 
                 term = ";"
-            rdf += """ frbr:embodimentOf meiUri:{xml_id} {term}""".format(xml_id = xml_id, term=term)
+            rdf += """ frbr:embodimentOf {embodiment_id} {term}""".format(
+                    embodiment_id = xml_id.replace("trompa-align_", "maps:") if xml_id.startswith("trompa-align_inserted_") else "meiUri:" + xml_id,
+                    term=term
+                )
         # iterate through again to annotate velocities for each performed note
         for ix3, velocity in enumerate(obs["velocity"]):
             rdf += """<#velocity{uuid}> a oa:Annotation ; 
     oa:motivatedBy oa:describing ;
     oa:hasTarget <#target{uuid}> .
 <#target{uuid}> oa:hasScope <> ;
-    oa:hasSource meiUri:{xml_id} ;
-    oa:bodyValue "{velocity}" .\n""".format(uuid = str(uuid4()).replace("-", ""), xml_id = obs["xml_id"][ix3], velocity = velocity)
+    oa:hasSource {embodiment_id} ;
+    oa:bodyValue "{velocity}" .\n""".format(
+            uuid = str(uuid4()).replace("-", ""), 
+            xml_id = obs["xml_id"][ix3], 
+            embodiment_id = obs["xml_id"][ix3].replace("trompa-align_", "maps:") if obs["xml_id"][ix3].startswith("trompa-align_inserted_") else "meiUri:" + obs["xml_id"][ix3],
+            velocity = velocity
+        )
 
     return Graph().parse(data = rdf, format='n3')
 
