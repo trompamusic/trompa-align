@@ -12,6 +12,8 @@ args = parser.parse_args()
 
 tmpUuid = os.path.join(os.getcwd(), "") + str(uuid.uuid4()) + ".tmp."
 
+print("PERFORMANCE ALIGNMENT WORKFLOW: Aligning performance MIDI file", args.performanceMidi)
+
 try: 
     print("** ALIGNMENT STEP 1: Synthesising canonical (score) MIDI")
     ret = os.system("python {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
