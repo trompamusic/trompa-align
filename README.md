@@ -1,4 +1,11 @@
-TO INSTALL
+## Using Docker
+### Install Docker
+sudo docker build -t trompa-align .
+### Run Docker
+sudo docker run --rm -it trompa-align python3 /trompa-align/scripts/performance_alignment_workflow.py
+
+## Using native
+### To Install 
 1. Rscript scripts/install-packages.R 
 2. pip install -r requirements.txt
 3. Install the Symbolic Music Alignment Tool (SMAT):
@@ -6,7 +13,7 @@ TO INSTALL
     * Unzip it and store the absolute path as `SMAT_PATH`
     * Compile it with: `cd SMAT_PATH; ./compile.sh`
 
-TO RUN
+### TO RUN
 
 First, prepare environment variables:
     `export SMAT_PATH=/local/path/to/SMAT` (as in installation step 3)
@@ -41,6 +48,8 @@ TO RUN EACH STAGE OF THE WORKFLOW: (from the trompa-align root directory):
 4. Convert the MAPS file to performance and timeline RDF
 
   `python scripts/convert_to_rdf.py -m $MAPS_FILE -c $SOLID_ROOT -u $MEI_URI -f tpl -s $STRUCTURE_URI -o $LD_OUT` 
+
+
 
 
 
