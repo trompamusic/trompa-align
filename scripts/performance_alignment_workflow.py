@@ -1,5 +1,5 @@
 import os, sys, argparse, csv, uuid
-
+PYTHON_VERSION = "python3"
 parser = argparse.ArgumentParser()
 parser.add_argument('--smatPath', help="Absolute path of locally installed Symbolic Music Alignment Tool folder", required=True)
 parser.add_argument('--meiUri', help="URI of MEI file being performed", required=True)
@@ -17,31 +17,36 @@ tmpUuid = os.path.join(os.getcwd(), "") + str(uuid.uuid4()) + ".tmp."
 try:
     if args.perfMidi is not None:
         print("** ALIGNMENT STEP 0: Writing performance MIDI to file")
-        ret = os.system("python {scriptsPath}/midi-events-to-file.py --midiJson {performanceMidi} --output {midiOut}".format(
+        ret = os.system("{python} {scriptsPath}/midi-events-to-file.py --midiJson {performanceMidi} --output {midiOut}".format(
+                scriptsPath=sys.path[0],
                 performanceMidi = args.performanceMidi,
-                midiOut = tmpUuid + "performance.mid"
+                midiOut = tmpUuid + "performance.mid",
+                python = PYTHON_VERSION
             )
         )
 
 
     print("** ALIGNMENT STEP 1: Synthesising canonical (score) MIDI")
-    ret = os.system("python {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
+    ret = os.system("{python} {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
             scriptsPath = sys.path[0],
             meiUri = args.meiUri,
-            canonicalMidi = tmpUuid + "canonical.mid"
-        )
+            canonicalMidi = tmpUuid + "canonical.mid",
+            python=PYTHON_VERSION
+    )
     )
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 1: Synthesising canonical (score) MIDI ")
 
     print("** ALIGNMENT STEP 2: Aligning canonical and performance MIDI")
-    ret = os.system("python {scriptsPath}/smat-align.py -s {smatPath} -c {canonicalMidi} -p {performanceMidi} -o {corresp}".format(
+    ret = os.system("{python} {scriptsPath}/smat-align.py -s {smatPath} -c {canonicalMidi} -p {performanceMidi} -o {corresp}".format(
             scriptsPath = sys.path[0],
             smatPath = args.smatPath,
             canonicalMidi = tmpUuid + "canonical.mid",
             performanceMidi = args.performanceMidiFile if args.performanceMidiFile is not None else tmpUuid + "performance.mid",
-            corresp = tmpUuid + "corresp"
-        )
+            corresp = tmpUuid + "corresp",
+            python=PYTHON_VERSION
+
+    )
     )
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 2: Aligning canonical and performance MIDI ")
@@ -58,14 +63,16 @@ try:
         sys.exit("** ALIGNMENT FAILED AT STEP 3: MIDI-to-MEI reconciliation ")
 
     print("** ALIGNMENT STEP 4: Converting MAPS output to aligned timeline Linked Data (JSONLD)")
-    ret = os.system("python {scriptsPath}/convert_to_rdf.py -m {maps} -c {solidClaraBaseUri} -u {meiUri} -s {structureUri} -o {timelineOutput} -f tpl".format(
+    ret = os.system("{python} {scriptsPath}/convert_to_rdf.py -m {maps} -c {solidClaraBaseUri} -u {meiUri} -s {structureUri} -o {timelineOutput} -f tpl".format(
             scriptsPath = sys.path[0],
             maps = tmpUuid + "maps.json",
             solidClaraBaseUri = args.solidClaraBaseUri,
             meiUri = args.meiUri,
             structureUri = args.structureUri,
-            timelineOutput = args.timelineOutput
-        )
+            timelineOutput = args.timelineOutput,
+            python=PYTHON_VERSION
+
+    )
     )
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 4: Converting MAPS output to timeline JSONLD ")
