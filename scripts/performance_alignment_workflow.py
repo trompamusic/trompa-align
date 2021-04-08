@@ -4,7 +4,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--smatPath', help="Absolute path of locally installed Symbolic Music Alignment Tool folder", required=True)
 parser.add_argument('--meiUri', help="URI of MEI file being performed", required=True)
 parser.add_argument('--structureUri', help="URI of the structural segmentation RDF for the MEI file being performed", required=True)
-parser.add_argument('--performanceMidi', help="Path to the locally stored performance MIDI file being aligned", required=True)
+parser.add_argument('--performanceMidi', help="Stringified JSON object containing MIDI event data received from client", required=True)
 parser.add_argument('--timelineOutput', help="Path to the alignment timeline JSONLD file to be generated", required=True)
 parser.add_argument('--solidClaraBaseUri', help="URI of base CLARA folder in user's SOLID Pod", required=True)
 #parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
@@ -12,9 +12,14 @@ args = parser.parse_args()
 
 tmpUuid = os.path.join(os.getcwd(), "") + str(uuid.uuid4()) + ".tmp."
 
-print("PERFORMANCE ALIGNMENT WORKFLOW: Aligning performance MIDI file", args.performanceMidi)
-
 try: 
+    print("** ALIGNMENT STEP 0: Writing performance MIDI to file")
+    ret = os.system("python {scriptsPath}/midi-events-to-file.py --midiJson {performanceMidi} --output {midiOut}".format(
+            performanceMidi = args.performanceMidi,
+            midiOut = tmpUuid + "performance.mid"
+        )
+    )
+
     print("** ALIGNMENT STEP 1: Synthesising canonical (score) MIDI")
     ret = os.system("python {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
             scriptsPath = sys.path[0],
@@ -30,7 +35,7 @@ try:
             scriptsPath = sys.path[0],
             smatPath = args.smatPath,
             canonicalMidi = tmpUuid + "canonical.mid",
-            performanceMidi = args.performanceMidi,
+            performanceMidi = tmpUuid + "performance.mid",
             corresp = tmpUuid + "corresp"
         )
     )
