@@ -15,7 +15,7 @@ args = parser.parse_args()
 tmpUuid = os.path.join(os.getcwd(), "") + str(uuid.uuid4()) + ".tmp."
 
 try:
-    if args.perfMidi is not None:
+    if args.performanceMidi is not None:
         print("** ALIGNMENT STEP 0: Writing performance MIDI to file")
         ret = os.system("{python} {scriptsPath}/midi-events-to-file.py --midiJson {performanceMidi} --output {midiOut}".format(
                 scriptsPath=sys.path[0],
