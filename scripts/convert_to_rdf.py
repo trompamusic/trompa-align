@@ -24,7 +24,7 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
 @prefix meiUri: <{meiUri}#> .
 @base <{tlUri}> .
 
-<> a tl:Timeline .
+<{tlUri}> a tl:Timeline .
     """.format(segUri = segUri, meiUri = meiUri, tlUri = tlUri)
 
     for ix, obs in enumerate(maps_result):
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('--meiFile', '-e', help="If provided, generate a structural segmentation for the MEI file", required=False)
     parser.add_argument('--meiUri', '-u', help="MEI file URI", required=False)
     parser.add_argument('--segmentlineOutput', '-p', help="Structural segmentation output", required=False)
-    parser.add_argument('--solidClaraRoot', '-c', help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.", required=False)
+    parser.add_argument('--solidContainer', '-c', help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.", required=False)
     parser.add_argument('--performancesFile', '-P', help="Performance metadata TSV file", required=False)
     parser.add_argument('--performancesUri', '-q', help="Prefix URI for generated performances RDF", required=False)
     parser.add_argument('--recordingUri', '-r', help="URI of recorded media directory for these performances", required=False)
@@ -244,16 +244,17 @@ if __name__ == "__main__":
     performancesUri = args.performancesUri if "performancesUri" in args else None
     recordingUri = args.recordingUri if "recordingUri" in args else None
     worksUri = args.worksUri if "worksUri" in args else None
-    solidClaraRoot = args.solidClaraRoot if "solidClaraRoot" in args else None
+    solidContainer = args.solidContainer if "solidContainer" in args else None
 
-    if solidClaraRoot is not None:
-        solidClaraRoot = os.path.join(solidClaraRoot, "")
-        performancesUri = os.path.join(solidClaraRoot, "performance", outputFName)
-        tlUri = os.path.join(solidClaraRoot, "timeline", outputFName)
+    if solidContainer is not None:
+        solidContainer = os.path.join(solidContainer, "")
+        performancesUri = os.path.join(solidContainer, "performance", os.path.basename(outputFName))
+        tlUri = os.path.join(solidContainer, os.path.basename(outputFName))
+        print("2: ", solidContainer, outputFName, tlUri)
     elif performancesUri is not None:
-        solidClaraRoot = os.path.dirname(performancesUri)
-    if recordingUri is None and solidClaraRoot is not None:
-        recordingUri = os.path.join(solidClaraRoot, "recording/")
+        solidContainer = os.path.dirname(performancesUri)
+    if recordingUri is None and solidContainer is not None:
+        recordingUri = os.path.join(solidContainer, "recording/")
 
     if performancesFile is not None:
         if segUri is None or meiUri is None or tlUri is None or recordingUri is None or performancesUri is None or worksUri is None:
