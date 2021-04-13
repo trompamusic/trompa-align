@@ -1,4 +1,4 @@
-import os, sys, argparse, csv, uuid
+import os, sys, argparse, csv, uuid, requests
 PYTHON_VERSION = "python3"
 parser = argparse.ArgumentParser()
 parser.add_argument('--smatPath', help="Absolute path of locally installed Symbolic Music Alignment Tool folder", required=True)
@@ -9,6 +9,7 @@ parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to
 perfMidiGroup = parser.add_mutually_exclusive_group(required=True)
 perfMidiGroup.add_argument('--performanceMidi', help="Stringified JSON object containing MIDI event data received from client")
 perfMidiGroup.add_argument('--performanceMidiFile', help="Locally stored MIDI file for the performance")
+perfMidiGroup.add_argument('--performanceMidiUri', help="Externally stored MIDI file URI for the performance")
 args = parser.parse_args()
 
 myUuid = str(uuid.uuid4())
@@ -16,6 +17,11 @@ tmpPrefix = os.path.join(os.getcwd(), "") + myUuid + ".tmp."
 outfile = os.path.join(os.getcwd(), "") + myUuid + ".jsonld"
 
 try:
+    if args.performanceMidiUri is not None:
+        downloadedPerformanceMidi = requests.get(args.performanceMidiUri)
+        print("TRYTING")
+        open(tmpPrefix + "performance.mid", 'wb').write(downloadedPerformanceMidi.content)
+
     if args.performanceMidi is not None:
         print("** ALIGNMENT STEP 0: Writing performance MIDI to file")
         ret = os.system("{python} {scriptsPath}/midi-events-to-file.py --midiJson {performanceMidi} --output {midiOut}".format(
@@ -87,6 +93,13 @@ finally:
         os.remove(tmpPrefix + "canonical.mid")
     except:
         print("** Error while tidying up: Couldn't delete ", tmpPrefix + "canonical.mid")
+    
+    if args.performanceMidiFile is None:
+        print("** POST-ALIGNMENT: Deleting temporary file: ", tmpPrefix + "performance.mid")
+        try: 
+            os.remove(tmpPrefix + "performance.mid")
+        except:
+            print("** Error while tidying up: Couldn't delete ", tmpPrefix + "canonical.mid")
 
     print("** POST-ALIGNMENT: Deleting temporary file: ", tmpPrefix + "corresp")
     try: 
