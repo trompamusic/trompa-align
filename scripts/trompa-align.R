@@ -14,9 +14,7 @@ library(fuzzyjoin) # for difference_inner_join
 library(reticulate) # to execute the Verovio python code
 library(glue) # for interpolated string niceness
 
-#Sys.setenv(RETICULATE_PYTHON=Sys.which("python"))
 use_python("/usr/bin/python3", required=TRUE)
-#use_virtualenv("./venv")
 
 correspFile <- args[1] # where our corresp.txt files live
 outputFile <- args[2] # where our data files will be generated
