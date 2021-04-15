@@ -3,6 +3,7 @@ PYTHON_VERSION = "python3"
 parser = argparse.ArgumentParser()
 parser.add_argument('--smatPath', help="Absolute path of locally installed Symbolic Music Alignment Tool folder", required=True)
 parser.add_argument('--meiUri', help="URI of MEI file being performed", required=True)
+parser.add_argument('--meiFile', help="Local MEI file path", required=False)
 parser.add_argument('--structureUri', help="URI of the structural segmentation RDF for the MEI file being performed", required=True)
 parser.add_argument('--solidContainer', help="URI of base CLARA folder in user's SOLID Pod", required=True)
 parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
@@ -34,13 +35,20 @@ try:
 
 
     print("** ALIGNMENT STEP 1: Synthesising canonical (score) MIDI")
-    ret = os.system("{python} {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
-            scriptsPath = sys.path[0],
-            meiUri = args.meiUri,
-            canonicalMidi = tmpPrefix + "canonical.mid",
-            python=PYTHON_VERSION
-    )
-    )
+    if args.meiFile is not None:
+        ret = os.system("{python} {scriptsPath}/mei-to-midi.py --meiFile {meiFile} --output {canonicalMidi}".format(
+                scriptsPath = sys.path[0],
+                meiFile= args.meiFile,
+                canonicalMidi = tmpPrefix + "canonical.mid",
+                python=PYTHON_VERSION
+        ))
+    else: 
+        ret = os.system("{python} {scriptsPath}/mei-to-midi.py --meiUri {meiUri} --output {canonicalMidi}".format(
+                scriptsPath = sys.path[0],
+                meiUri = args.meiUri,
+                canonicalMidi = tmpPrefix + "canonical.mid",
+                python=PYTHON_VERSION
+        ))
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 1: Synthesising canonical (score) MIDI ")
 
@@ -59,13 +67,23 @@ try:
         sys.exit("** ALIGNMENT FAILED AT STEP 2: Aligning canonical and performance MIDI ")
 
     print("** ALIGNMENT STEP 3: Performing MIDI-to-MEI reconciliation and producing MAPS output")
-    ret = os.system("Rscript {scriptsPath}/trompa-align.R {corresp} {maps} {meiUri}".format(
-            scriptsPath = sys.path[0],
-            corresp = tmpPrefix + "corresp",
-            maps = tmpPrefix + "maps.json",
-            meiUri = args.meiUri
+
+    if args.meiFile is not None:
+        ret = os.system("Rscript {scriptsPath}/trompa-align.R {corresp} {maps} {meiFile}".format(
+                scriptsPath = sys.path[0],
+                corresp = tmpPrefix + "corresp",
+                maps = tmpPrefix + "maps.json",
+                meiFile = args.meiFile
+            )
         )
-    )
+    else: 
+        ret = os.system("Rscript {scriptsPath}/trompa-align.R {corresp} {maps} {meiUri}".format(
+                scriptsPath = sys.path[0],
+                corresp = tmpPrefix + "corresp",
+                maps = tmpPrefix + "maps.json",
+                meiUri = args.meiUri
+            )
+        )
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 3: MIDI-to-MEI reconciliation ")
 
