@@ -31,30 +31,28 @@ def receiveMidiBatch():
         try:
             eventType = "UNKNOWN"
             messageCode = int(note["data"]["_messageCode"])
-            code = (note["data"]["_data"]["0"] >> 4) & 0b00000111
-            channel = note["data"]["_data"]["0"] & 0b00001111
+            code = 0b11110000 & note["data"]["_data"]["0"];
+            channel = 1 + (0b00001111 & note["data"]["_data"]["0"]) 
             key = note["data"]["_data"]["1"]
-            velocity = note["data"]["_data"]["2"] & 0b01111111
-
-            print("code: ", code, "channel: ", channel, "key: ", key, "vel: ", velocity)
+            velocity = note["data"]["_data"]["2"] 
 
             time = round(second2tick((note["timestamp"]-prevTime)/1000, ticks_per_beat=ticks_per_beat, tempo=tempo))
-            if code == 0b001:
-                eventType = "note_on"
-                track.append(Message(eventType, channel=0, note=key, velocity=velocity, time=time))
-                print("APPEND NOTE ON: ", eventType, 0, key, velocity, time)
-                prevTime = note["timestamp"]
-            elif code == 0b000:# or code == 0b0000:
+            if code == 0b10000000:
                 eventType = "note_off"
-                track.append(Message(eventType, channel=0, note=key, velocity=velocity, time=time))
-                print("APPEND NOTE OFF: ", eventType, 0, key, velocity, time)
+                track.append(Message(eventType, channel=channel, note=key, velocity=velocity, time=time))
+                print("APPEND NOTE OFF: code ", format(code, '08b'), "eventType: ", eventType, "channel: ", channel, "key: ", key, "vel: ", velocity, " time: ",time)
                 prevTime = note["timestamp"]
-            elif code == 0b011:
+            elif code == 0b10010000:
+                eventType = "note_on"
+                track.append(Message(eventType, channel=channel, note=key, velocity=velocity, time=time))
+                print("APPEND NOTE ON: code ", format(code, '08b'), "eventType: ", eventType, "channel: ", channel, "key: ", key, "vel: ", velocity, " time: ",time)
+                prevTime = note["timestamp"]
+            elif code == 0b10110000:
                 eventType = "control_change"
-                track.append(Message(eventType, channel=0, control=key, value=velocity, time=time))
-                print("APPEND CONTROL CHANGE: ", eventType, 0, key, velocity, time)
+                track.append(Message(eventType, channel=channel, control=key, value=velocity, time=time))
+                print("APPEND CONTROL CHANGE: code ", format(code, '08b'), "eventType: ", eventType, "channel: ", channel, "key: ", key, "vel: ", velocity, " time: ",time)
                 prevTime = note["timestamp"]
-            elif code == 0b010:
+            elif code == 0b10100000:
                 eventType = "polytouch"
                 #track.append(Message(eventType, channel=0, note=key, value=velocity, time=time))
 #            elif(code == 192):
@@ -62,18 +60,17 @@ def receiveMidiBatch():
 #                track.append(Message(eventType, channel=0, note=key, velocity=velocity, time=time))
 #                 eventType = "program_change"
                 #track.append(Message(eventType, channel=0, program=key, time=time))
-            elif code == 0b101:
+            elif code == 0b11010000:
                 eventType = "aftertouch"
                 #track.append(Message(eventType, channel=0, value=key, time=time))
-            elif code == 0b110:
+            elif code == 0b11100000:
                 eventType = "pitchwheel"
                 #track.append(Message(eventType, channel=0, pitch=key, time=time))
-            elif code == 0b111:
+            elif code == 0b11110000:
                 eventType = "sysex"
                 #track.append(Message(eventType, data=(key, velocity), time=time))
             else:
-                print("UNKNOWN CODE WAS ", code)
-            print("EVENT TYPE: ", eventType);
+                print("UNKNOWN CODE WAS ", format(code, '08b'))
 
             #track.append(Message(eventType, note=key, velocity=velocity, time=time))
             #track.append(Message(code, note=key, velocity=velocity, time=time))

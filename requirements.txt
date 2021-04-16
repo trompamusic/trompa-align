@@ -5,3 +5,5 @@ urllib3==1.25.7
 verovio
 mido
 requests 
+midi2audio
+pydub
