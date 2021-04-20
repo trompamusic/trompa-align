@@ -101,7 +101,9 @@ import verovio
 import json 
 import urllib.request
 
+verovio.enableLog(False)
 tk = verovio.toolkit()
+print('VERSION', tk.getVersion())
 try: 
     {loadMeiIntoVerovioPython}
 except:

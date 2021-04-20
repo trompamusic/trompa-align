@@ -5,6 +5,8 @@ parser.add_argument('--smatPath', help="Absolute path of locally installed Symbo
 parser.add_argument('--meiUri', help="URI of MEI file being performed", required=True)
 parser.add_argument('--meiFile', help="Local MEI file path", required=False)
 parser.add_argument('--structureUri', help="URI of the structural segmentation RDF for the MEI file being performed", required=True)
+parser.add_argument('--scoreUri', help="URI of the conceptual score RDF for the MEI file being performed", required=True)
+parser.add_argument('--audioContainer', help="URI of the Solid Container that will host the synthesised audio", required=True)
 parser.add_argument('--solidContainer', help="URI of base CLARA folder in user's SOLID Pod", required=True)
 parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
 perfMidiGroup = parser.add_mutually_exclusive_group(required=True)
@@ -87,8 +89,19 @@ try:
     if ret:
         sys.exit("** ALIGNMENT FAILED AT STEP 3: MIDI-to-MEI reconciliation ")
 
-    print("** ALIGNMENT STEP 4: Converting MAPS output to aligned timeline Linked Data (JSONLD)")
-    ret = os.system("{python} {scriptsPath}/convert_to_rdf.py -m {maps} -c {solidContainer} -t {timelineUri} -u {meiUri} -s {structureUri} -o {timelineOutput} -f tpl".format(
+    print("** ALIGNMENT STEP 4: Synthesising performance mp3 from performance MIDI") 
+    ret = os.system("{python} {scriptsPath}/midi-to-mp3.py -m {performanceMidi} -o {mp3Out}".format(
+        performanceMidi = args.performanceMidiFile if args.performanceMidiFile is not None else tmpPrefix + "performance.mid",
+        mp3Out = myUuid + ".mp3",
+        scriptsPath = sys.path[0],
+        python=PYTHON_VERSION
+    ))
+    if ret:
+        sys.exit("** ALIGNMENT FAILED AT STEP 4: Synthesising performance mp3 from performance MIDI")
+
+
+    print("** ALIGNMENT STEP 5: Converting MAPS output to aligned timeline Linked Data (JSONLD)")
+    ret = os.system("{python} {scriptsPath}/convert_to_rdf.py -m {maps} -c {solidContainer} -t {timelineUri} -u {meiUri} -s {structureUri} -o {timelineOutput} -a {audioUri} -z {scoreUri} -i -f tpl".format(
             scriptsPath = sys.path[0],
             maps = tmpPrefix + "maps.json",
             solidContainer = args.solidContainer,
@@ -96,12 +109,13 @@ try:
             structureUri = args.structureUri,
             timelineOutput = outfile,
             timelineUri = os.path.join(args.solidContainer + myUuid+".jsonld"),
+            audioUri = os.path.join(args.audioContainer, myUuid + ".mp3"),
+            scoreUri = args.scoreUri,
             python=PYTHON_VERSION
 
-    )
-    )
+    ))
     if ret:
-        sys.exit("** ALIGNMENT FAILED AT STEP 4: Converting MAPS output to timeline JSONLD ")
+        sys.exit("** ALIGNMENT FAILED AT STEP 5: Converting MAPS output to timeline JSONLD ")
 
     print("** ALIGNMENT SUCCESS! Output produced: ", myUuid + ".jsonld")
 
