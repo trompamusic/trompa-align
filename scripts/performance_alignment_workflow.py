@@ -9,20 +9,20 @@ parser.add_argument('--scoreUri', help="URI of the conceptual score RDF for the 
 parser.add_argument('--audioContainer', help="URI of the Solid Container that will host the synthesised audio", required=True)
 parser.add_argument('--solidContainer', help="URI of base CLARA folder in user's SOLID Pod", required=True)
 parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
+parser.add_argument('--uuid', help="UUID for generated output. If not provided, a new one will be generated", required=False)
 perfMidiGroup = parser.add_mutually_exclusive_group(required=True)
 perfMidiGroup.add_argument('--performanceMidi', help="Stringified JSON object containing MIDI event data received from client")
 perfMidiGroup.add_argument('--performanceMidiFile', help="Locally stored MIDI file for the performance")
 perfMidiGroup.add_argument('--performanceMidiUri', help="Externally stored MIDI file URI for the performance")
 args = parser.parse_args()
 
-myUuid = str(uuid.uuid4())
+myUuid = args.uuid if args.uuid is not None else str(uuid.uuid4())
 tmpPrefix = os.path.join(os.getcwd(), "") + myUuid + ".tmp."
 outfile = os.path.join(os.getcwd(), "") + myUuid + ".jsonld"
 
 try:
     if args.performanceMidiUri is not None:
         downloadedPerformanceMidi = requests.get(args.performanceMidiUri)
-        print("TRYTING")
         open(tmpPrefix + "performance.mid", 'wb').write(downloadedPerformanceMidi.content)
 
     if args.performanceMidi is not None:
