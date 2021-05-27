@@ -200,11 +200,15 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
 
 <{meiUri}> a mo:PublishedScore .
 
-<> a so:SegmentLine .
+<> a mo:Score ;
+    mo:published_as <{meiUri}> ;
+    meld:segments <{segUri}{formatPlaceholder}#segmentation> .
+
+<{segUri}{formatPlaceholder}#segmentation> a so:SegmentLine .
     """.format(segUri = segUri, meiUri = meiUri, formatPlaceholder = formatPlaceholder)
     for ix, seg in enumerate(seg_data):
         rdf += """<#{segId}> a so:Segment ; 
-    so:onSegmentLine <> ;
+    so:onSegmentLine <{segUri}{formatPlaceholder}#segmentation> ;
     meld:order "{ix}" ;
     frbr:embodiment [ a meld:MEIManifestation, rdf:Bag ;
     rdfs:member <{sectionId}> ;
@@ -217,6 +221,7 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
         ix = ix,
         segUri = segUri,
         segId = seg,
+        formatPlaceholder = formatPlaceholder,
         sectionId = meiUri + "#" + seg,
         first = "<" + meiUri + "#" + seg_data[seg]["first"] + ">",
         last = "<" + meiUri + "#" + seg_data[seg]["last"] + ">",
@@ -267,7 +272,7 @@ if __name__ == "__main__":
     recordingUri = args.recordingUri if "recordingUri" in args else None
     worksUri = args.worksUri if "worksUri" in args else None
     solidContainer = args.solidContainer if "solidContainer" in args else None
-    includePerformance = True if "includePerformance" in args else False
+    includePerformance = args.includePerformance if "includePerformance" in args else False
     scoreUri = args.scoreUri if "scoreUri" in args else None 
     audioUri = args.audioUri if "audioUri" in args else None 
 
