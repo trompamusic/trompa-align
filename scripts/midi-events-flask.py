@@ -8,11 +8,11 @@ import json, uuid, os, sys
 # set up parameters
 PYTHON_VERSION="python3"
 SMAT_PATH="/home/weigl/repos/trompa-align-packaged-for-tpl/trompa-align/AlignmentTool_v190813"
-MEI_URI="https://raw.githubusercontent.com/trompamusic-encodings/Schumann-Clara_Romanze-in-a-Moll/master/Schumann-Clara_Romanze-ohne-Opuszahl_a-Moll.mei"
-STRUCTURE_URI="https://clara.trompa-solid.upf.edu/clara.trompamusic.folder/structure/Schumann-Clara_Romanze-ohne-Opuszahl_A-Moll.jsonld" 
-SOLID_CONTAINER="https://clara-test.trompa-solid.upf.edu/private/test1"
-SCORE_URI="https://clara.trompa-solid.upf.edu/clara.trompamusic.folder/score/SchumannClara_Romanze.jsonld" 
-AUDIO_CONTAINER="https://clara-test.trompa-solid.upf.edu/private/audio/"
+MEI_URI="https://tpl-alignment-test.trompa-solid.upf.edu/public/mei/twinkle.mei"
+STRUCTURE_URI="https://tpl-alignment-test.trompa-solid.upf.edu/public/structure/twinkle.jsonld"
+SCORE_URI="https://tpl-alignment-test.trompa-solid.upf.edu/public/structure/twinkle.jsonld"
+AUDIO_CONTAINER="https://tpl-alignment-test.trompa-solid.upf.edu/public/audio/"
+SOLID_CONTAINER="https://tpl-alignment-test.trompa-solid.upf.edu/public/performance/"
 
 app = Flask(__name__)
 CORS(app)
@@ -89,6 +89,9 @@ def receiveMidiBatch():
             print("Problem with: ", note, e)
     myUuid = str(uuid.uuid4())
     midiFile.save(myUuid + ".mid")
+    with open(myUuid + ".mid.json", "w") as outfile:
+        outfile.write(json.dumps(midiBatch, indent=2))
+
     ret = os.system("{python} performance_alignment_workflow.py --smatPath {smatPath} --meiUri {meiUri} --structureUri  {structureUri} --solidContainer {solidContainer} --tpl-out {scriptsPath}/{uuid}-tplOut.jsonld --performanceMidiFile {scriptsPath}/{uuid}.mid --scoreUri {scoreUri} --audioContainer {audioContainer} --uuid {uuid}".format(
             python=PYTHON_VERSION,
             smatPath=SMAT_PATH,
