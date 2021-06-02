@@ -11,7 +11,7 @@ parser.add_argument('--solidContainer', help="URI of base CLARA folder in user's
 parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
 parser.add_argument('--uuid', help="UUID for generated output. If not provided, a new one will be generated", required=False)
 perfMidiGroup = parser.add_mutually_exclusive_group(required=True)
-perfMidiGroup.add_argument('--performanceMidi', help="Stringified JSON object containing MIDI event data received from client")
+perfMidiGroup.add_argument('--performanceMidi', help="JSON file containing MIDI event data received from client")
 perfMidiGroup.add_argument('--performanceMidiFile', help="Locally stored MIDI file for the performance")
 perfMidiGroup.add_argument('--performanceMidiUri', help="Externally stored MIDI file URI for the performance")
 args = parser.parse_args()
