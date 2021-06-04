@@ -1,22 +1,26 @@
-#use ubuntu as base
-FROM ubuntu:latest
+FROM python:3.7
 
 #install dependencies (R, python, wget, unzip)
-RUN apt-get update
-RUN apt-get -y install tzdata
-RUN apt-get -y install wget && apt-get -y install git && apt-get install -y unzip && apt-get install -y make && apt-get install -y r-base && apt-get install python3.7
-RUN apt-get -y install python3-pip
+RUN apt-get update \
+    && apt-get -y install tzdata wget git unzip make r-base \
+    && rm -rf /var/lib/apt/lists/*
 
 #download smat
 RUN mkdir -p /smat
 RUN wget https://midialignment.github.io/AlignmentTool_v190813.zip -O /smat/smat.zip
-RUN unzip /smat/smat.zip -d /smat
-# this is the command that fails
-
-#clone project and install requirements
-RUN git clone --branch TPL https://github.com/trompamusic/trompa-align
-RUN python3 -m pip install -r /trompa-align/requirements.txt
-RUN Rscript /trompa-align/scripts/install-packages.R
+RUN unzip /smat/smat.zip -d /smat \
+    && cd /smat/AlignmentTool_v190813 \
+    && ./compile.sh \
+    && mv Programs/* /usr/local/bin
 
 
-RUN cd /smat/AlignmentTool_v190813 && ./compile.sh
+RUN mkdir /code
+WORKDIR /code
+
+COPY ./scripts/install-packages.R /code/scripts/
+RUN Rscript /code/scripts/install-packages.R
+
+COPY requirements.txt /code
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /code
