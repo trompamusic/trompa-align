@@ -5,10 +5,11 @@ from rdflib import Graph, plugin
 from rdflib.serializer import Serializer
 from lxml import etree as ET
 from statistics import mean
+from datetime import datetime
 
 formatPlaceholder = "____MAPS-FORMAT"
 
-def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri): 
+def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance): 
     maps_result = json.loads(maps_result_json)
     rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
@@ -23,8 +24,25 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
 @prefix segUri: <{segUri}#> .
 @prefix meiUri: <{meiUri}#> .
 @base <{tlUri}> .
+""".format(tlUri = tlUri, segUri = segUri, meiUri = meiUri)
 
-<> a tl:Timeline .
+    if includePerformance:
+        label = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        rdf += """<{tlUri}> a mo:Performance ;
+  mo:performance_of <{scoreUri}> ;
+  mo:recorded_as <{tlUri}#Signal> ;
+  rdfs:label "{label}" ;
+  meld:offset "-0.2" .
+<{tlUri}#Signal> mo:available_as <{audioUri}> ;
+    mo:time [ 
+        a tl:Interval; 
+        tl:onTimeLine <{tlUri}#timeline> 
+    ] .
+
+""".format(tlUri = tlUri, scoreUri = scoreUri, label = label, audioUri = audioUri)
+
+    rdf += """
+<{tlUri}#timeline> a tl:Timeline .
     """.format(segUri = segUri, meiUri = meiUri, tlUri = tlUri)
 
     for ix, obs in enumerate(maps_result):
@@ -32,9 +50,9 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
         # FIXME HACK -- currently averages note velocities occuring at the same time
         velocity = """maps:velocity "{0}" ;""".format(mean(obs["velocity"])) if "velocity" in obs else "" 
         rdf += """tlUri:{ix} a tl:Instant ;
- tl:onTimeLine <> ;
+ tl:onTimeLine <{tlUri}#timeline> ;
  {confidence}{velocity}
- tl:at "P{mean_onset}S" ; """.format(ix = ix, mean_onset = obs["obs_mean_onset"], confidence = confidence, velocity = velocity)
+ tl:at "P{mean_onset}S" ; """.format(ix = ix, mean_onset = obs["obs_mean_onset"], confidence = confidence, velocity = velocity, tlUri = tlUri)
         # iterate through each associated MEI identifier
         for ix2, xml_id in enumerate(obs["xml_id"]):
             if ix2 == len(obs["xml_id"])-1: 
@@ -49,14 +67,15 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri):
         for ix3, velocity in enumerate(obs["velocity"]):
             rdf += """<#velocity{uuid}> a oa:Annotation ; 
     oa:motivatedBy oa:describing ;
-    oa:hasTarget <#target{uuid}> .
-<#target{uuid}> oa:hasScope <> ;
-    oa:hasSource {embodiment_id} ;
-    oa:bodyValue "{velocity}" .\n""".format(
+    oa:hasTarget <#target{uuid}> ;
+    oa:bodyValue "{velocity}" .
+<#target{uuid}> oa:hasScope <{tlUri}#timeline> ;
+    oa:hasSource {embodiment_id} .\n""".format(
             uuid = str(uuid4()).replace("-", ""), 
             xml_id = obs["xml_id"][ix3], 
             embodiment_id = obs["xml_id"][ix3].replace("trompa-align_", "maps:") if obs["xml_id"][ix3].startswith("trompa-align_inserted_") else "meiUri:" + obs["xml_id"][ix3],
-            velocity = velocity
+            velocity = velocity,
+            tlUri = tlUri
         )
 
     return Graph().parse(data = rdf, format='n3')
@@ -78,7 +97,7 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
                 # generate performance RDF
                 "performance": performance_to_graph(row, tlUri, recordingUri, performancesUri, worksUri),
                 # generate timeline RDF
-                "timeline": maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri + "/" + row["PerformanceID"] + formatPlaceholder),
+                "timeline": maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri + "/" + row["PerformanceID"] + formatPlaceholder, False),
                 "performanceID": row["PerformanceID"]
             })
             
@@ -181,11 +200,15 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
 
 <{meiUri}> a mo:PublishedScore .
 
-<> a so:SegmentLine .
+<> a mo:Score ;
+    mo:published_as <{meiUri}> ;
+    meld:segments <{segUri}{formatPlaceholder}#segmentation> .
+
+<{segUri}{formatPlaceholder}#segmentation> a so:SegmentLine .
     """.format(segUri = segUri, meiUri = meiUri, formatPlaceholder = formatPlaceholder)
     for ix, seg in enumerate(seg_data):
         rdf += """<#{segId}> a so:Segment ; 
-    so:onSegmentLine <> ;
+    so:onSegmentLine <{segUri}{formatPlaceholder}#segmentation> ;
     meld:order "{ix}" ;
     frbr:embodiment [ a meld:MEIManifestation, rdf:Bag ;
     rdfs:member <{sectionId}> ;
@@ -198,6 +221,7 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
         ix = ix,
         segUri = segUri,
         segId = seg,
+        formatPlaceholder = formatPlaceholder,
         sectionId = meiUri + "#" + seg,
         first = "<" + meiUri + "#" + seg_data[seg]["first"] + ">",
         last = "<" + meiUri + "#" + seg_data[seg]["last"] + ">",
@@ -223,11 +247,14 @@ if __name__ == "__main__":
     parser.add_argument('--meiFile', '-e', help="If provided, generate a structural segmentation for the MEI file", required=False)
     parser.add_argument('--meiUri', '-u', help="MEI file URI", required=False)
     parser.add_argument('--segmentlineOutput', '-p', help="Structural segmentation output", required=False)
-    parser.add_argument('--solidClaraRoot', '-c', help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.", required=False)
+    parser.add_argument('--solidContainer', '-c', help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.", required=False)
     parser.add_argument('--performancesFile', '-P', help="Performance metadata TSV file", required=False)
     parser.add_argument('--performancesUri', '-q', help="Prefix URI for generated performances RDF", required=False)
     parser.add_argument('--recordingUri', '-r', help="URI of recorded media directory for these performances", required=False)
     parser.add_argument('--worksUri', '-w', help="Prefix URI for works", required=False)
+    parser.add_argument('--includePerformance', '-i', help="Flag to determine whether performance info should be written alongside timeline output", action="store_true")
+    parser.add_argument('--scoreUri', '-z', help="Score definition URI; required if includePerforance is true", required=False)
+    parser.add_argument('--audioUri', '-a', help="Audio URI; required if includePerforance is true", required=False)
 
     args = parser.parse_args()
 
@@ -244,16 +271,22 @@ if __name__ == "__main__":
     performancesUri = args.performancesUri if "performancesUri" in args else None
     recordingUri = args.recordingUri if "recordingUri" in args else None
     worksUri = args.worksUri if "worksUri" in args else None
-    solidClaraRoot = args.solidClaraRoot if "solidClaraRoot" in args else None
+    solidContainer = args.solidContainer if "solidContainer" in args else None
+    includePerformance = args.includePerformance if "includePerformance" in args else False
+    scoreUri = args.scoreUri if "scoreUri" in args else None 
+    audioUri = args.audioUri if "audioUri" in args else None 
 
-    if solidClaraRoot is not None:
-        solidClaraRoot = os.path.join(solidClaraRoot, "")
-        performancesUri = os.path.join(solidClaraRoot, "performance", outputFName)
-        tlUri = os.path.join(solidClaraRoot, "timeline", outputFName)
+    if includePerformance and (scoreUri is None or audioUri is None):
+        sys.exit("You must provide each of --scoreUri and --audioUri if includePerformance is requested")
+    if solidContainer is not None:
+        solidContainer = os.path.join(solidContainer, "")
+        performancesUri = os.path.join(solidContainer, "performance", os.path.basename(outputFName))
+        tlUri = os.path.join(solidContainer, os.path.basename(outputFName))
+        print("2: ", solidContainer, outputFName, tlUri)
     elif performancesUri is not None:
-        solidClaraRoot = os.path.dirname(performancesUri)
-    if recordingUri is None and solidClaraRoot is not None:
-        recordingUri = os.path.join(solidClaraRoot, "recording/")
+        solidContainer = os.path.dirname(performancesUri)
+    if recordingUri is None and solidContainer is not None:
+        recordingUri = os.path.join(solidContainer, "recording/")
 
     if performancesFile is not None:
         if segUri is None or meiUri is None or tlUri is None or recordingUri is None or performancesUri is None or worksUri is None:
@@ -293,7 +326,7 @@ if __name__ == "__main__":
                 except IOError: 
                     print("Could not read file: ", fName)
                     sys.exit()
-                g = maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri)
+                g = maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance)
                 if(outputFormat == 'ttl' or outputFormat == 'both'):
                     ttl = graph_to_turtle(g)
                     with open(outputFName + ".ttl", "w") as ttl_file:

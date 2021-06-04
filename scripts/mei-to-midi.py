@@ -2,6 +2,7 @@
 
 import sys, argparse, urllib.parse, requests
 import verovio
+verovio.enableLog(False)
 def toMidi(mei, fname):
     vrv = verovio.toolkit()
     vrv.loadData(mei)

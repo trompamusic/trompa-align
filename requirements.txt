@@ -4,3 +4,6 @@ rdflib-jsonld==0.5.0
 urllib3==1.25.7
 verovio
 mido
+requests 
+midi2audio
+pydub

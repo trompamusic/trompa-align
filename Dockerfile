@@ -14,7 +14,7 @@ RUN unzip /smat/smat.zip -d /smat
 # this is the command that fails
 
 #clone project and install requirements
-RUN git clone https://github.com/trompamusic/trompa-align
+RUN git clone --branch TPL https://github.com/trompamusic/trompa-align
 RUN python3 -m pip install -r /trompa-align/requirements.txt
 RUN Rscript /trompa-align/scripts/install-packages.R
 
