@@ -7,3 +7,4 @@ mido
 requests 
 midi2audio
 pydub
+git+https://github.com/trompamusic/solid-oidc-app-permission.git@master
