@@ -7,12 +7,6 @@ ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
 def main(mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname):
-    # download MEI file
-    r = read_from_solid(webid, mei_uri, "text/plain")
-    r.raise_for_status()
-    mei = r.text
-    with open(os.path.join(tempdir, "score.mei"), 'w') as out:
-        out.write(mei)
     # build args object
     perform_workflow(
         os.path.join(tempdir, "performanceMidi.mid"), # performance_midi
@@ -111,15 +105,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--performanceMidiUri', required=True)
     parser.add_argument('--isWebMidi', required=False)
+    parser.add_argument('--isExternalMei', required=False)
     parser.add_argument('--meiUri', required=True)
+    parser.add_argument('--meiFile', required=False)
     parser.add_argument('--structureUri', required=True)
     parser.add_argument('--performanceContainer', required=True)
     parser.add_argument('--audioContainer', required=True)
     parser.add_argument('--webId', required=True)
     parser.add_argument('--performanceFilename', required=False)
     parser.add_argument('--audioFilename', required=False)
-    tempdir = tempfile.mkdtemp()
+    meiGroup = parser.add_mutually_exclusive_group(required=True)
+    meiGroup.add_argument('--isExternalMei')
+    meiGroup.add_argument('--meiFile')
+
     args = parser.parse_args()
+    
+    tempdir = tempfile.mkdtemp()
 
     if args.performanceFilename:
         perf_fname = args.performanceFilename
@@ -137,5 +138,18 @@ if __name__ == '__main__':
     else: 
         with open(os.path.join(tempdir,"performanceMidi.mid"), 'wb') as out:
             out.write(performance_data)
+
+    if args.isExternalMei:
+        # Solid-hosted, non-CE MEI file. Download it.
+        r = read_from_solid(webid, mei_uri, "text/plain")
+        r.raise_for_status()
+        mei = r.text
+    else: 
+        with open(meiFile, 'r') as f:
+            mei = f.read()
+
+    with open(os.path.join(tempdir, "score.mei"), 'w') as out:
+        out.write(mei)
+
     main(args.meiUri, args.structureUri, args.performanceContainer,
          args.audioContainer, args.webId, tempdir, perf_fname, audio_fname)
