@@ -8,7 +8,7 @@ tempo = bpm2tempo(120)
 
 def main(mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname):
     # download MEI file
-    r = requests.get(mei_uri)
+    r = read_from_solid(webid, mei_uri, "text/plain")
     r.raise_for_status()
     mei = r.text
     with open(os.path.join(tempdir, "score.mei"), 'w') as out:
@@ -26,19 +26,33 @@ def main(mei_uri, structure_uri, performance_container, audio_container, webid, 
         perf_fname,
         audio_fname
     )
-    write_to_solid(webid, tempdir)
+    write_to_solid(webid, tempdir, performance_container, perf_fname, "application/ld+json")
+    write_to_solid(webid, tempdir, audio_container, audio_fname, "audio/mpeg")
 
-def write_to_solid(webid, tempdir):
-    print("Now I would have tried to write to Solid with ", webid, tempdir)
-#    client.init_redis()
-#    identity_provider = solid.lookup_provider_from_profile(web_id)
-#    bearer = client.get_bearer_for_user(identity_provider,web_id)
-#    r = requests.put("https://alastair.trompa-solid.upf.edu/testfile.txt", data="this is the contents to add to the file", headers={"authorization": "Bearer %s" % bearer, "content-type": "text/plain"})
+def write_to_solid(webid, tempdir, container, fname, contenttype):
+    client.init_redis()
+    identity_provider = lookup_provider_from_profile(webid)
+    data = open(os.path.join(tempdir, fname), 'rb').read()
+    bearer = client.get_bearer_for_user(identity_provider, webid)
+    r = requests.put(os.path.join(container, fname), data=data, headers={"authorization": "Bearer %s" % bearer, "content-type": contenttype})
 
-def webmidi_to_midi(webmidi_json_uri, tempdir):
-    r = requests.get(webmidi_json_uri)
-    r.raise_for_status()
-    midiNotes = r.json()
+def read_from_solid(webid, uri, contenttype):
+    client.init_redis()
+    identity_provider = lookup_provider_from_profile(webid)
+    bearer = client.get_bearer_for_user(identity_provider, webid)
+    return requests.get(uri, headers={"authorization": "Bearer %s" % bearer, "content-type": contenttype})
+
+def lookup_provider_from_profile(webid):
+    r = requests.options(webid)
+    links = r.headers.get('Link')
+    if links:
+        parsed_links = requests.utils.parse_header_links(links)
+        for l in parsed_links:
+            if l.get('rel') == 'http://openid.net/specs/connect/1.0/issuer':
+                return l['url']
+
+def webmidi_to_midi(webmidi_json, tempdir):
+    midiNotes = webmidi_json
     midiFile = MidiFile()
     midiFile.ticks_per_beat = ticks_per_beat
         
@@ -95,7 +109,7 @@ def webmidi_to_midi(webmidi_json_uri, tempdir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--performanceMidi', required=True)
+    parser.add_argument('--performanceMidiUri', required=True)
     parser.add_argument('--isWebMidi', required=False)
     parser.add_argument('--meiUri', required=True)
     parser.add_argument('--structureUri', required=True)
@@ -106,6 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--audioFilename', required=False)
     tempdir = tempfile.mkdtemp()
     args = parser.parse_args()
+
     if args.performanceFilename:
         perf_fname = args.performanceFilename
     else: 
@@ -114,14 +129,13 @@ if __name__ == '__main__':
         audio_fname = args.audioFilename
     else: 
         audio_fname = str(uuid.uuid4()) + ".mp3"
+
+    performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+
     if args.isWebMidi:
-        webmidi_to_midi(args.performanceMidi, tempdir)
+        webmidi_to_midi(performance_data, tempdir)
     else: 
-        r = requests.get(args.performanceMidi).content
-        if r.status < 400:
-            with open(os.path.join(tempdir,"performanceMidi.mid"), 'wb') as out:
-                out.write(perfMidi)
-        else:
-            raise Exception("Could not download performanceMidi: ", args.performanceMidi)
+        with open(os.path.join(tempdir,"performanceMidi.mid"), 'wb') as out:
+            out.write(performance_data)
     main(args.meiUri, args.structureUri, args.performanceContainer,
          args.audioContainer, args.webId, tempdir, perf_fname, audio_fname)
