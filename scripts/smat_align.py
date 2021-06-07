@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 
 
-def align(file1, file2):
+def smat_align(file1, file2):
     # Align 2 midi files. This is a python port of MIDIToMIDIAlign.sh from SMAT
     # It assumes that the compiled tools are in $PATH
     # Because we use a temporary directory, we don't bother to clean up anything

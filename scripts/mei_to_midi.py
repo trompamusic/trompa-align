@@ -3,7 +3,7 @@
 import sys, argparse, urllib.parse, requests
 import verovio
 verovio.enableLog(False)
-def toMidi(mei, fname):
+def mei_to_midi(mei, fname):
     vrv = verovio.toolkit()
     vrv.loadData(mei)
     vrv.renderToMIDIFile(fname)
@@ -30,6 +30,6 @@ if __name__ == "__main__":
     else:
         resp = requests.get(meiUri)
         data = resp.text
-    toMidi(data, output)
+    mei_to_midi(data, output)
 
 

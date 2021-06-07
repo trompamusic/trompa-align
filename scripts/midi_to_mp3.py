@@ -3,19 +3,17 @@ from midi2audio import FluidSynth
 from pydub import AudioSegment
 import argparse, uuid, os 
 
+def midi_to_mp3(midifile, output, tempdir):
+    tempfile = os.path.join(tempdir, "synthAudio.wav")
+    fs = FluidSynth()
+    fs.midi_to_audio(midifile, tempfile)
+    wav = AudioSegment.from_file(tempfile, format="wav")
+    wav.export(output, format="mp3")
+
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser()
     parser.add_argument('--midiFile', '-m', help="Path to a MIDI file", required=True)
     parser.add_argument('--output', '-o', help="Name of output MP3 file to generate", required=True)
     args = parser.parse_args()
+    midi_to_mp3(args.midiFile, args.output, tmpfile.mkdtemp())
 
-    tmpFile = str(uuid.uuid4()) + ".tmp.wav"
-
-    fs = FluidSynth()
-    fs.midi_to_audio(args.midiFile, tmpFile)
-    wav = AudioSegment.from_file(tmpFile, format="wav")
-    wav.export(args.output, format="mp3")
-    try:
-        os.remove(tmpFile)
-    except Exception as e:
-        print("Sorry, couldn't clean up temporary .wav file, please remove manually: ", tmpFile, e)
