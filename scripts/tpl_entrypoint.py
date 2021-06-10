@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
     if args.isExternalMei:
         # Solid-hosted, non-CE MEI file. Download it.
-        r = read_from_solid(webid, mei_uri, "text/plain")
+        r = read_from_solid(args.webId, args.meiUri, "text/plain")
         r.raise_for_status()
         mei = r.text
     else: 
