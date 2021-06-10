@@ -6,6 +6,8 @@ from performance_alignment_workflow import perform_workflow
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
+REDIS_HOST = os.environ.get("TPL_AUTH_REDIS_HOST", "localhost")
+
 def main(mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname):
     # build args object
     perform_workflow(
@@ -24,14 +26,14 @@ def main(mei_uri, structure_uri, performance_container, audio_container, webid, 
     write_to_solid(webid, tempdir, audio_container, audio_fname, "audio/mpeg")
 
 def write_to_solid(webid, tempdir, container, fname, contenttype):
-    client.init_redis()
+    client.init_redis(REDIS_HOST)
     identity_provider = lookup_provider_from_profile(webid)
     data = open(os.path.join(tempdir, fname), 'rb').read()
     bearer = client.get_bearer_for_user(identity_provider, webid)
     r = requests.put(os.path.join(container, fname), data=data, headers={"authorization": "Bearer %s" % bearer, "content-type": contenttype})
 
 def read_from_solid(webid, uri, contenttype):
-    client.init_redis()
+    client.init_redis(REDIS_HOST)
     identity_provider = lookup_provider_from_profile(webid)
     bearer = client.get_bearer_for_user(identity_provider, webid)
     return requests.get(uri, headers={"authorization": "Bearer %s" % bearer, "content-type": contenttype})
