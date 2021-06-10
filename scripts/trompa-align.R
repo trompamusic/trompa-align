@@ -14,7 +14,7 @@ library(fuzzyjoin) # for difference_inner_join
 library(reticulate) # to execute the Verovio python code
 library(glue) # for interpolated string niceness
 
-use_python("/usr/bin/python3", required=TRUE)
+use_python("/usr/local/bin/python", required=TRUE)
 
 correspFile <- args[1] # where our corresp.txt files live
 outputFile <- args[2] # where our data files will be generated
