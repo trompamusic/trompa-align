@@ -1,6 +1,6 @@
 import argparse, tempfile, requests, os, uuid, json
 from convert_to_rdf import generate_structural_segmentation, segmentation_to_graph, graph_to_jsonld
-from mei_to_midi import mei_to_midi
+import mei_to_midi
 
 def main(mei_file, mei_uri, structure_uri, structure_out, midi_out):
     # generate structure RDF (jsonld)

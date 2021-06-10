@@ -5,7 +5,6 @@ parser.add_argument('--meiFile', help="Path to local MEI file", required=True)
 parser.add_argument('--segmentlineOutput', help="Path to local segment RDF output file", required=True)
 parser.add_argument('--meiUri', help="URI of MEI file", required=True)
 parser.add_argument('--segmentlineHost', help="Segment line host (URI of directory that will contain the segment RDF output file", required=True)
-parser.add_argument('--tpl-out', help="File used by TROMPA Processing Library to identify the segment RDF output", required=True)
 
 args = parser.parse_args()
 
