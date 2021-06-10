@@ -144,7 +144,7 @@ if __name__ == '__main__':
         r.raise_for_status()
         mei = r.text
     else: 
-        with open(args.meiUri, 'r') as f:
+        with open(args.meiFile, 'r') as f:
             mei = f.read()
 
     with open(os.path.join(tempdir, "score.mei"), 'w') as out:
