@@ -119,7 +119,7 @@ if __name__ == '__main__':
     meiGroup.add_argument('--meiFile')
 
     args = parser.parse_args()
-    
+    meiGroupArgs = meiGroup.parse_args()
     tempdir = tempfile.mkdtemp()
 
     if args.performanceFilename:
@@ -145,7 +145,7 @@ if __name__ == '__main__':
         r.raise_for_status()
         mei = r.text
     else: 
-        with open(meiFile, 'r') as f:
+        with open(meiGroupArgs.meiUri, 'r') as f:
             mei = f.read()
 
     with open(os.path.join(tempdir, "score.mei"), 'w') as out:
