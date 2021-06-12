@@ -124,7 +124,8 @@ if __name__ == '__main__':
     mei_to_midi(mei_data, os.path.join(tempdir,"meiMidi.mid"))
     performance_midi = os.path.join(tempdir,"performanceMidi.mid")
     score_midi = os.path.join(tempdir,"meiMidi.mid")
-    mei_file = os.path.join(tempdir, "score.mei")
+    mei_file = args.mei
+
     audio_fname = args.audio
     maps_fname = args.maps
 

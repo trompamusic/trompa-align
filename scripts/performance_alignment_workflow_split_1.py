@@ -10,6 +10,7 @@ PYTHON_VERSION = "python3"
 def perform_workflow_split_1(performance_midi, canonical_midi, mei_file, tempdir, audio_fname, maps_fname):
     print("** Performing SMAT_ALIGN")
     corresp = smat_align(canonical_midi, performance_midi)
+    print(corresp)
     with open(os.path.join(tempdir, "corresp.txt"), 'w') as out:
         out.write(corresp)
 
