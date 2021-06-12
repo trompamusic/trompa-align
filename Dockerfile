@@ -5,7 +5,9 @@ RUN apt-get update \
     && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm fluid-soundfont-gs tzdata wget git unzip make r-base \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir /usr/share/soundfonts
 RUN ln -s /usr/share/sounds/sf2/FluidR3_GM.sf2 /usr/share/soundfonts/default.sf2
+
 #download smat
 RUN mkdir -p /smat
 RUN wget https://midialignment.github.io/AlignmentTool_v190813.zip -O /smat/smat.zip
