@@ -9,7 +9,7 @@ import subprocess
 
 PYTHON_VERSION = "python3"
 
-def perform_workflow_split_1(performance_midi, canonical_midi, mei_file, mei_uri, structure_uri, webid, tempdir, audio_fname): 
+def perform_workflow_split_1(performance_midi, canonical_midi, mei_file, tempdir, audio_fname):
     print("** Performing SMAT_ALIGN")
     corresp = smat_align(canonical_midi, performance_midi)
     with open(os.path.join(tempdir, "corresp.txt"), 'w') as out:

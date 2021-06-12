@@ -2,21 +2,30 @@ import argparse, tempfile, requests, os, uuid
 from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
 from trompasolid import client
 from performance_alignment_workflow_split_1 import perform_workflow_split_1
+from mei_to_midi import mei_to_midi
+import json
 
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
 REDIS_HOST = os.environ.get("TPL_AUTH_REDIS_HOST", "localhost")
 
-def main(mei_uri, structure_uri, webid, tempdir, audio_fname, score_midi):
+def main(performance_midi, score_midi, audio_fname, tempdir):
     # build args object
     perform_workflow_split_1(
         os.path.join(tempdir, "performanceMidi.mid"), # performance_midi
         score_midi,
         os.path.join(tempdir, "score.mei"),           # mei_file
-        mei_uri,                                      # mei_uri
-        structure_uri,                                # structure_uri
-        webid,                                        # webid
+        tempdir,                                       # tempdir
+        audio_fname
+    )
+
+def main(performance_midi, score_midi, mei_file, audio_fname, tempdir):
+    # build args object
+    perform_workflow_split_1(
+        performance_midi, # performance_midi
+        score_midi,
+        mei_file,           # mei_file
         tempdir,                                       # tempdir
         audio_fname
     )
@@ -94,43 +103,28 @@ def webmidi_to_midi(webmidi_json, tempdir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--performanceMidiUri', required=True)
-    parser.add_argument('--isWebMidi', required=False)
-    parser.add_argument('--meiUri', required=True)
-    parser.add_argument('--scoreMidi', required=True)
-    parser.add_argument('--structureUri', required=True)
-    parser.add_argument('--webId', required=True)
-    parser.add_argument('--audioFilename', required=False)
-    meiGroup = parser.add_mutually_exclusive_group(required=True)
-    meiGroup.add_argument('--isExternalMei')
-    meiGroup.add_argument('--meiFile')
+    parser.add_argument('--performanceMidi', required=True)
+    parser.add_argument('--mei', required=True)
+    parser.add_argument('--audioFilename', required=True)
 
     args = parser.parse_args()
     tempdir = tempfile.mkdtemp()
 
-    if args.audioFilename:
-        audio_fname = args.audioFilename
-    else: 
-        audio_fname = str(uuid.uuid4()) + ".mp3"
+    with open(args.mei, 'r') as f:
+        mei_data = f.read()
+    f.close(
 
-    performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+    )
+  #  performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+    performance_data = open(args.performanceMidi,'r').read()
+    performance_data = json.loads(performance_data)
+    webmidi_to_midi(performance_data, tempdir)
+    mei_to_midi(mei_data, os.path.join(tempdir,"meiMidi.mid"))
+    performance_midi = os.path.join(tempdir,"performanceMidi.mid")
+    score_midi = os.path.join(tempdir,"meiMidi.mid")
+    mei_file = os.path.join(tempdir, "score.mei")
+    audio_fname = args.audioFilename
 
-    if args.isWebMidi:
-        webmidi_to_midi(performance_data, tempdir)
-    else: 
-        with open(os.path.join(tempdir,"performanceMidi.mid"), 'wb') as out:
-            out.write(performance_data)
-
-    if args.isExternalMei:
-        # Solid-hosted, non-CE MEI file. Download it.
-        r = read_from_solid(args.webId, args.meiUri, "text/plain")
-        r.raise_for_status()
-        mei = r.text
-    else: 
-        with open(args.meiFile, 'r') as f:
-            mei = f.read()
-
-    with open(os.path.join(tempdir, "score.mei"), 'w') as out:
-        out.write(mei)
-
-    main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
+    main(performance_midi, score_midi, mei_file, audio_fname, tempdir)
+   # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
+   # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
