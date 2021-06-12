@@ -20,14 +20,15 @@ def main(performance_midi, score_midi, audio_fname, tempdir):
         audio_fname
     )
 
-def main(performance_midi, score_midi, mei_file, audio_fname, tempdir):
+def main(performance_midi, score_midi, mei_file, audio_fname, tempdir, maps_fname):
     # build args object
     perform_workflow_split_1(
         performance_midi, # performance_midi
         score_midi,
         mei_file,           # mei_file
         tempdir,                                       # tempdir
-        audio_fname
+        audio_fname,
+        maps_fname
     )
 
 def read_from_solid(webid, uri, contenttype):
@@ -103,9 +104,10 @@ def webmidi_to_midi(webmidi_json, tempdir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--performanceMidi', required=True)
+    parser.add_argument('--performance', required=True)
     parser.add_argument('--mei', required=True)
-    parser.add_argument('--audioFilename', required=True)
+    parser.add_argument('--audio', required=True)
+    parser.add_argument('--maps', required=True)
 
     args = parser.parse_args()
     tempdir = tempfile.mkdtemp()
@@ -124,7 +126,8 @@ if __name__ == '__main__':
     score_midi = os.path.join(tempdir,"meiMidi.mid")
     mei_file = os.path.join(tempdir, "score.mei")
     audio_fname = args.audioFilename
+    maps_fname = args.maps
 
-    main(performance_midi, score_midi, mei_file, audio_fname, tempdir)
+    main(performance_midi, score_midi, mei_file, audio_fname, tempdir, maps_fname)
    # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
    # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
