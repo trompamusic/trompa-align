@@ -1,0 +1,58 @@
+client parms
+--ce_ini ../config/tpl_local.ini --client_ini "../client/MAPS Update.ini" --inputs 5102b18e-514a-4429-a4dd-3f6a77fa3750 72bc2f0a-d060-475e-a833-0bfee30573b3 aa28cd71-4c9b-4c90-a846-ce092a97ffad e681aa63-77f2-430b-9f32-ade8221bc96c f0847fb6-fbcc-4021-a114-5f575068dbb1 -params 0 --storage_info /home/aggelos/bin/align_new/workflow_split2_storage.txt
+
+
+mutation {
+  RequestControlAction(
+    controlAction: {
+      potentialActionIdentifier: "2c96f22e-80b8-47f1-9461-27ef347aaa61"
+      entryPointIdentifier: "134a0673-50a4-49a4-bbbd-1bfa50f049b5"
+      propertyObject: [
+        {
+          nodeIdentifier: "5102b18e-514a-4429-a4dd-3f6a77fa3750"
+          potentialActionPropertyIdentifier: "85126af1-5110-4df1-86c8-5fe02c9b76fd"
+          nodeType: MediaObject
+        }
+        {
+          nodeIdentifier: "72bc2f0a-d060-475e-a833-0bfee30573b3"
+          potentialActionPropertyIdentifier: "28ca4053-51ef-456f-93ce-6229edd40864"
+          nodeType: MediaObject
+        }
+        {
+          nodeIdentifier: "aa28cd71-4c9b-4c90-a846-ce092a97ffad"
+          potentialActionPropertyIdentifier: "d065534b-cd6c-4e6c-b09e-30a3e4e2b8a8"
+          nodeType: DigitalDocument
+        }
+        {
+          nodeIdentifier: "e681aa63-77f2-430b-9f32-ade8221bc96c"
+          potentialActionPropertyIdentifier: "bb7ae49a-f2e9-4d1e-b395-62bee6bef951"
+          nodeType: AudioObject
+        }
+        {
+          nodeIdentifier: "f0847fb6-fbcc-4021-a114-5f575068dbb1"
+          potentialActionPropertyIdentifier: "cccc0a8a-2fd8-4aed-b877-6373625b748d"
+          nodeType: DigitalDocument
+        }
+      ]
+      propertyValueObject: [
+        {
+          value: "gAAAAABgxgnn9ir1BGzTOABckV47pTIPs_VjGk42BPmjlt-MH9PVwIdEeq6BSjd8wU5dg_zjLoVBYCgM73qpbwfuWDD9YrTl3Bkl4DXBOK6ST4vb-rjAXD826QA6SQib83qIJ9sqIGZ7QzkDLL0ujrZSVe9zU453WVujsOe7wlvpviwshdgBEL6kpHeh9Efo3EmMC8z2KTHNJ-eGA6kHewzvTPUHBfqzhuzuaL6i6UMxTONkgDyzGttjF6K3zt4io3asqqkEk8vtEOy-7LG2E9vikroOPjzcASOtGIDf9si3lzHfeOBt4BNePPebzGgD4PcCuiLnXTTh3tqf8-tJo8sKDITz9bI-p1bSGcaQgDF25R5Nkun-Ha82BxbxSPtjsCVjnT4uOfDx8l7Ediufkmgmei1QRtdZVqxos-JaZ6j2PwCehmQRMzt4vl2Te7BBa64DYk2QXZy87_SbZ2voGga7WB8jz0DL14kZbBYnc4z6mbLRDoH8QHWCX39Y81WAHPkQr-RY14y0P5lN8LvX2PnE6XXdf917V6QtF4Q3kPcGKwsn8GcJUnorCq9cQWAM56jwsye9Og3LbBHKkbRUyGeOwZvT1q4LkbYyIBj1L3kcR12tEWuCaSU="
+          potentialActionPropertyValueSpecificationIdentifier: "68372f23-cf13-4718-8e75-16142101387f"
+          valuePattern: String
+        }
+      ]
+    }
+  ) {
+    identifier
+  }
+}
+
+
+query {
+  DigitalDocument(identifier: "1c5fef44-6db8-40de-86d2-37b60c5a5915") {
+    identifier
+    
+    source
+    
+  }
+}
