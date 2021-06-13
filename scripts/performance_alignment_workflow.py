@@ -23,6 +23,7 @@ def perform_workflow(performance_midi, mei_file, mei_uri, structure_uri, perform
     mei_to_midi(mei_data, os.path.join(tempdir, "canonical.mid"))
 
     print("** Performing SMAT_ALIGN")
+    print("performance_midi: ", performance_midi)
     corresp = smat_align(os.path.join(tempdir, "canonical.mid"), performance_midi)
     with open(os.path.join(tempdir, "corresp.txt"), 'w') as out:
         out.write(corresp)

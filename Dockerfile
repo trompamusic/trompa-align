@@ -2,8 +2,11 @@ FROM python:3.7
 
 #install dependencies (R, python, wget, unzip)
 RUN apt-get update \
-    && apt-get -y install ffmpeg fluidsynth tzdata wget git unzip make r-base \
+    && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm fluid-soundfont-gs tzdata wget git unzip make r-base \
     && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /usr/share/soundfonts
+RUN ln -s /usr/share/sounds/sf2/FluidR3_GM.sf2 /usr/share/soundfonts/default.sf2
 
 #download smat
 RUN mkdir -p /smat
