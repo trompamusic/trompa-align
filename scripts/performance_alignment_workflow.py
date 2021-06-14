@@ -49,7 +49,7 @@ def perform_workflow(performance_midi, mei_file, mei_uri, structure_uri, perform
         structure_uri, 
         mei_uri, 
         os.path.join(performance_container, perf_fname),
-        mei_uri,
+        structure_uri,
         os.path.join(audio_container, audio_fname),
         True
     )
