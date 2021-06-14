@@ -10,6 +10,7 @@ args = parser.parse_args()
 
 # ensure our output file ends in .jsonld
 #seglineOut = args.segmentlineOutput if args.segmentlineOutput.endswith(".jsonld") else args.segmentlineOutput + ".jsonld"
+seglineOut = args.segmentlineOutput
 # build the URI for the generated file, inserting a slash if necessary
 segmentlineUri = args.segmentlineHost + seglineOut if args.segmentlineHost.endswith("/") else args.segmentlineHost + "/" + seglineOut
 
