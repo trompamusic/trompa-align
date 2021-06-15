@@ -18,7 +18,7 @@ def perform_workflow_split_2(performance_uri, mei_uri, structure_uri, audio_uri,
         structure_uri, 
         mei_uri, 
         performance_uri,
-        mei_uri,
+        structure_uri,
         audio_uri,
         True
     )
