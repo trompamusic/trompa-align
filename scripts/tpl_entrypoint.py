@@ -105,7 +105,6 @@ def webmidi_to_midi(webmidi_json, tempdir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--performanceMidiUri', required=True)
     parser.add_argument('--isWebMidi', required=False)
     parser.add_argument('--meiUri', required=True)
     parser.add_argument('--structureUri', required=True)
@@ -117,6 +116,9 @@ if __name__ == '__main__':
     meiGroup = parser.add_mutually_exclusive_group(required=True)
     meiGroup.add_argument('--isExternalMei')
     meiGroup.add_argument('--meiFile')
+    midiGroup = parser.add_mutually_exclusive_group(required=True)
+    midiGroup.add_argument('--performanceMidiFile')
+    midiGroup.add_argument('--performanceMidiUri')
 
     args = parser.parse_args()
     tempdir = tempfile.mkdtemp()
@@ -130,7 +132,11 @@ if __name__ == '__main__':
     else: 
         audio_fname = str(uuid.uuid4()) + ".mp3"
 
-    performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+    if args.performanceMidiUri:
+        performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+    elif args.performanceMidiFile:
+        with open(args.performanceMidiFile, 'rb') as midi:
+            performance_data = midi.read()
 
     if args.isWebMidi:
         webmidi_to_midi(performance_data, tempdir)
