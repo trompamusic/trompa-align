@@ -1,8 +1,8 @@
 # set up parameters
 
 args <- commandArgs(trailingOnly=TRUE)
-if(length(args) < 3 || length(args) > 4) {
-  print("Invoke as: Rscript trompa-align.R $CORRESP_FILE $OUTPUT_FILE [$MEI_URI || $MEI_FILE] {threshold-in-ms (default=5)}")
+if(length(args) < 4 || length(args) > 5) {
+  print("Invoke as: Rscript trompa-align.R $CORRESP_FILE $OUTPUT_FILE [$MEI_URI || $MEI_FILE] $EXPANSION {threshold-in-ms (default=5)}")
   quit()
 }
 
@@ -19,7 +19,8 @@ use_python("/usr/local/bin/python", required=TRUE)
 correspFile <- args[1] # where our corresp.txt files live
 outputFile <- args[2] # where our data files will be generated
 meiFile <- args[3] # which MEI file we're aligning with
-if(length(args) == 3) { 
+expansion <- args[4] # value for Verovio expand option (send empty string to skip)
+if(length(args) == 4) { 
   threshold <- 5 # alignment threshold between Verovio-timemap and corresp reference times (to overcome rounding issues)
 } else { 
   threshold <- args[4]
@@ -44,6 +45,8 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   
   # separate out inserted notes (i.e., performed notes that aren't in the score)
   insertedNotes <- corresp %>% filter(refID == "-1")
+  print("Inserted notes detected: ")
+  print(nrow(insertedNotes))
   
   # the rest are notes that were aligned via SMAT
   smatAlignedNotes <- setdiff(corresp, insertedNotes)
@@ -95,6 +98,10 @@ loadMeiIntoVerovioPython <- if(startsWith(meiFile, "http")) glue("
     tk.loadFile('{meiFile}')
 ")
 
+setExpansionOption <- if(nchar(expansion)) glue("
+tk.setOption('expand', '{expansion}')
+") else ""
+
 # Python code to grab MIDI values from Verovio, in order to align corresp file with MEI note IDs
 generateAttrsPython <- glue("
 import verovio
@@ -103,6 +110,7 @@ import urllib.request
 
 verovio.enableLog(False)
 tk = verovio.toolkit()
+{setExpansionOption}
 print('VERSION', tk.getVersion())
 try: 
     {loadMeiIntoVerovioPython}

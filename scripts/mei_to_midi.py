@@ -3,8 +3,10 @@
 import sys, argparse, urllib.parse, requests
 import verovio
 verovio.enableLog(False)
-def mei_to_midi(mei, fname):
+def mei_to_midi(mei, fname, expansion):
     vrv = verovio.toolkit()
+    if bool(expansion):
+        vrv.setOption('expand', expansion)
     vrv.loadData(mei)
     vrv.renderToMIDIFile(fname)
 
@@ -13,6 +15,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--meiUri', '-u', help="URI of a publicly accessible MEI file", required=False)
     parser.add_argument('--meiFile', '-m', help="Path to an MEI file", required=False)
+    parser.add_argument('--expansion', '-m', help="Value to send to Verovio expansion parameter", required=False)
     parser.add_argument('--output', '-o', help="Name of output MIDI file to generate", required=True)
     args = parser.parse_args()
     meiUri = args.meiUri
@@ -30,6 +33,6 @@ if __name__ == "__main__":
     else:
         resp = requests.get(meiUri)
         data = resp.text
-    mei_to_midi(data, output)
+    mei_to_midi(data, output, args.expansion)
 
 

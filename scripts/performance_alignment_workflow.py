@@ -9,7 +9,7 @@ import subprocess
 
 PYTHON_VERSION = "python3"
 
-def perform_workflow(performance_midi, mei_file, mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname): 
+def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname): 
     if mei_file is not None:
         with open(mei_file, 'r') as f:
           mei_data = f.read()
@@ -20,7 +20,7 @@ def perform_workflow(performance_midi, mei_file, mei_uri, structure_uri, perform
             out.write(mei_data)
         mei_file = os.path.join(tempdir, "score.mei")
     print("** Performing MEI_TO_MIDI")
-    mei_to_midi(mei_data, os.path.join(tempdir, "canonical.mid"))
+    mei_to_midi(mei_data, os.path.join(tempdir, "canonical.mid"), expansion)
 
     print("** Performing SMAT_ALIGN")
     print("performance_midi: ", performance_midi)
@@ -29,12 +29,14 @@ def perform_workflow(performance_midi, mei_file, mei_uri, structure_uri, perform
         out.write(corresp)
 
     print("** Performing RECONCILIATION")
+    exp = expansion if bool(expansion) else ""
     subprocess.run([
         "Rscript",
         os.path.join(sys.path[0], "trompa-align.R"), 
         os.path.join(tempdir, "corresp.txt"), 
         os.path.join(tempdir, "maps.json"),
-        mei_file
+        mei_file,
+        exp
     ])
 
     print("** Performing AUDIO SYNTHESIS")
