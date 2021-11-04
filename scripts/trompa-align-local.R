@@ -8,11 +8,11 @@ if(length(args) < 4 || length(args) > 5) {
 
 # load libraries
 
-library(tidyverse) # for dplyr, maggritr and friends
-library(jsonlite) # for read_json
-library(fuzzyjoin) # for difference_inner_join
-library(reticulate) # to execute the Verovio python code
-library(glue) # for interpolated string niceness
+suppressMessages(library(tidyverse)) # for dplyr, maggritr and friends
+suppressMessages(library(jsonlite)) # for read_json
+suppressMessages(library(fuzzyjoin)) # for difference_inner_join
+suppressMessages(library(reticulate)) # to execute the Verovio python code
+suppressMessages(library(glue)) # for interpolated string niceness
 
 #use_python("/usr/local/bin/python", required=TRUE)
 use_python("/usr/bin/python", required=TRUE)
@@ -67,7 +67,7 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   # group them by their *performance* time
   mapsExport <- matched %>% 
     select(id, alignOntime, alignOnvel) %>% 
-    group_by(alignOntime) %>% 
+    #group_by(alignOntime) %>% 
     summarise(list(id), list(alignOnvel))
   head(mapsExport)
   names(mapsExport) <- c("obs_mean_onset", "xml_id", "velocity")
