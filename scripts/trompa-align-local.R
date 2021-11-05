@@ -67,7 +67,7 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   # group them by their *performance* time
   mapsExport <- matched %>% 
     select(id, alignOntime, alignOnvel) %>% 
-    #group_by(alignOntime) %>% 
+    group_by(alignOntime) %>% 
     summarise(list(id), list(alignOnvel))
   head(mapsExport)
   names(mapsExport) <- c("obs_mean_onset", "xml_id", "velocity")
