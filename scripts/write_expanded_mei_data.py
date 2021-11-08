@@ -1,10 +1,10 @@
 import sys, argparse, urllib.parse, requests
-import verovio
+import verovio,json
 verovio.enableLog(False)
 def write_expanded_mei_data(mei, fname, expansion):
     vrv = verovio.toolkit()
     if bool(expansion):
-        vrv.setOption('expand', expansion)
+        vrv.setOptions(json.dumps({'expand': expansion}))
     vrv.loadData(mei)
     print("writing mei to: ", fname)
     vrv.saveFile(fname)
@@ -13,7 +13,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--meiUri', '-u', help="URI of a publicly accessible MEI file", required=False)
     parser.add_argument('--meiFile', '-m', help="Path to an MEI file", required=False)
-    parser.add_argument('--expansion', '-m', help="Value to send to Verovio expansion parameter", required=False)
+    parser.add_argument('--expansion', '-e', help="Value to send to Verovio expansion parameter", required=False)
     parser.add_argument('--output', '-o', help="Name of output MEI file to generate", required=True)
     args = parser.parse_args()
     meiUri = args.meiUri
@@ -31,5 +31,5 @@ if __name__ == "__main__":
     else:
         resp = requests.get(meiUri)
         data = resp.text
-    expand_mei_data(data, output, args.expansion)
+    write_expanded_mei_data(data, output, args.expansion)
 
