@@ -2,7 +2,9 @@ import os, sys, argparse, csv, uuid, requests, json, tempfile, pathlib
 from smat_align import smat_align
 from write_expanded_mei_data import write_expanded_mei_data
 from mei_to_midi import mei_to_midi
+from datetime import datetime
 import subprocess
+import logging
 
 def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
     # fetch MEI
@@ -11,27 +13,35 @@ def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
     [process(performance_midi_file, mei_uri, expansions, outdir, tempdir, mei_data) for performance_midi_file in midi_files]
 
 def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
-    print("**PROCESSING ", midi)
+    logging.basicConfig( 
+            filename="log-" + datetime.now().isoformat() + ".log", 
+            encoding="utf-8", level=logging.DEBUG, 
+            format='%(asctime)s %(message)s', 
+            datefmt='%m/%d/%Y %I:%M:%S %p')
     corresp_file = os.path.join(tempdir, midi.name) + ".corresp"
     fewest_inserted_notes = None
     best_expansion = None
+    logging.debug("Processing: " + midi.name)
     for expansion in expansions:
-        print("attempting expansion: ", expansion)
+        logging.debug("- Expansion: " + expansion)
         try: 
             mei_file = pathlib.Path(
                     outdir,
                     pathlib.Path(mei_uri).stem + "." + expansion + ".mei")
             canonical = pathlib.Path(tempdir, expansion + ".canonical.mid")
             if not mei_file.is_file():
-                print("Writing expanded mei data")
+                logging.debug("  writing expanded mei data")
                 write_expanded_mei_data(mei_data, str(mei_file), expansion)
             if not canonical.is_file():
-                print("Generating canonical MIDI")
+                logging.debug("  generating canonical MIDI")
                 mei_to_midi(mei_data, str(canonical), expansion)
+            logging.debug("  performing SMAT alignment")
             corresp = smat_align(str(canonical), midi)
             with open(corresp_file, 'w') as out:
                 out.write(corresp)
+                logging.debug("  produced corresp file: " + corresp_file)
             maps_file = os.path.join(outdir, midi.name + ".maps." + expansion + ".json")
+            logging.debug("  performing MEI reconciliation")
             inserted_notes_output = subprocess.check_output([
                 "Rscript",
                 os.path.join(sys.path[0], "trompa-align-local.R"), 
@@ -42,19 +52,19 @@ def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
             ])
             split = inserted_notes_output.split()[1]
             num_inserted_notes = int(split)
-            print("COMPLETED RUN: ", num_inserted_notes)
+            logging.debug("  COMPLETED RUN: " + str(num_inserted_notes))
             if fewest_inserted_notes is None or num_inserted_notes < fewest_inserted_notes:
                 fewest_inserted_notes = num_inserted_notes
                 best_expansion = expansion
-                print("current best: ", best_expansion, " ", fewest_inserted_notes)
+                logging.debug("  current best: " + str(best_expansion) + " " + str(fewest_inserted_notes))
             else:
                 # not the best expansion, so throw away the maps file
                 pathlib.Path(maps_file).unlink()
-                print("throwing out unused expansion: ", expansion)
+                logging.debug("  throwing out unused expansion: " + expansion)
 
         except Exception as e:
-            print("!!!!! Could not process ", midi, " -- skipping")
-            print("!!!!! Exception was: ", e)
+            logging.error("!!!!! Could not process " + midi.name + " -- skipping")
+            logging.error("!!!!! Exception was: " + e)
             break
 
 
