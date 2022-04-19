@@ -81,8 +81,10 @@ if __name__ == '__main__':
     print("Tempdir: ", tempdir)
     if args.standard_expansions:
         expansions = ["expansion-default", "expansion-minimal"]
-    else: 
+    elif args.expansion:
         expansions = [args.expansion]
+    else: 
+        expansions = ["expansion-default"]
     midi_files = [path for path in pathlib.Path(args.performancedir).rglob('*.mid')]
     print("About to start processing with expansions: ", expansions)
     batch_process(midi_files, args.meiuri, expansions, args.outputdir, tempdir)
