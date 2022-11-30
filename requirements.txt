@@ -4,7 +4,9 @@ rdflib-jsonld==0.5.0
 urllib3==1.25.7
 verovio
 mido
-requests 
+requests
 midi2audio
 pydub
 git+https://github.com/trompamusic/solid-oidc-app-permission.git@master
+Flask==1.1.2
+Flask-Cors==3.0.9
