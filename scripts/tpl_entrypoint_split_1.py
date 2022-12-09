@@ -121,7 +121,7 @@ if __name__ == '__main__':
     performance_data = open(args.performance,'r').read()
     performance_data = json.loads(performance_data)
     webmidi_to_midi(performance_data, tempdir)
-    mei_to_midi(mei_data, os.path.join(tempdir,"meiMidi.mid"))
+    mei_to_midi(mei_data, os.path.join(tempdir,"meiMidi.mid"), False)
     performance_midi = os.path.join(tempdir,"performanceMidi.mid")
     score_midi = os.path.join(tempdir,"meiMidi.mid")
     mei_file = args.mei
@@ -130,5 +130,3 @@ if __name__ == '__main__':
     maps_fname = args.maps
 
     main(performance_midi, score_midi, mei_file, audio_fname, tempdir, maps_fname)
-   # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)
-   # main(args.meiUri, args.structureUri, args.webId, tempdir, audio_fname, args.scoreMidi)

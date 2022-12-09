@@ -1,8 +1,8 @@
 # set up parameters
 
 args <- commandArgs(trailingOnly=TRUE)
-if(length(args) < 4 || length(args) > 5) {
-  print("Invoke as: Rscript trompa-align.R $CORRESP_FILE $OUTPUT_FILE [$MEI_URI || $MEI_FILE] $EXPANSION {threshold-in-ms (default=5)}")
+if(length(args) < 3 || length(args) > 4) {
+  print("Invoke as: Rscript trompa-align.R $CORRESP_FILE $OUTPUT_FILE $VEROVIO_NOTES_JSON {threshold-in-ms (default=5)}")
   quit()
 }
 
@@ -11,22 +11,16 @@ if(length(args) < 4 || length(args) > 5) {
 library(tidyverse) # for dplyr, maggritr and friends
 library(jsonlite) # for read_json
 library(fuzzyjoin) # for difference_inner_join
-library(reticulate) # to execute the Verovio python code
 library(glue) # for interpolated string niceness
-
-use_python("/usr/local/bin/python", required=TRUE)
 
 correspFile <- args[1] # where our corresp.txt files live
 outputFile <- args[2] # where our data files will be generated
-meiFile <- args[3] # which MEI file we're aligning with
-expansion <- args[4] # value for Verovio expand option (send empty string to skip)
-if(length(args) == 4) { 
+verovioNotesJsonFile <- args[3] # Verovio's positions of notes in json format
+if(length(args) == 3) {
   threshold <- 5 # alignment threshold between Verovio-timemap and corresp reference times (to overcome rounding issues)
-} else { 
+} else {
   threshold <- args[4]
 }
-
-
 
 generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function to generate a MAPS result object from a corresp file
   print(paste("Processing", correspFile))
@@ -91,49 +85,8 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   print(paste("MAPS file written:", outputFile))
 }
 
-# Python code to load MEI into a Verovio Toolkit (tk) from a URI or a local file
-loadMeiIntoVerovioPython <- if(startsWith(meiFile, "http")) glue("
-    tk.loadData(urllib.request.urlopen('{meiFile}').read().decode())
-") else glue("
-    tk.loadFile('{meiFile}')
-")
-
-setExpansionOption <- if(nchar(expansion)) glue("
-tk.setOption('expand', '{expansion}')
-") else ""
-
-# Python code to grab MIDI values from Verovio, in order to align corresp file with MEI note IDs
-generateAttrsPython <- glue("
-import verovio
-import json 
-import urllib.request
-
-verovio.enableLog(False)
-tk = verovio.toolkit()
-{setExpansionOption}
-print('VERSION', tk.getVersion())
-try: 
-    {loadMeiIntoVerovioPython}
-except:
-    print('Python: Could not load MEI file: {meiFile}')
-
-print('Python: Rendering to MIDI')
-tk.renderToMIDI() # must render to MIDI first or getMIDIValuesForElement won't work
-print('Python: Rendering to Timemap')
-timemap = json.loads(tk.renderToTimemap())
-allNotes = []
-timemapNoteOns = list(filter(lambda x: 'on' in x, timemap))
-list(map(lambda x: list(map(lambda y: allNotes.append({{
-    'id': y,
-    'tstamp': x['tstamp'],
-    'midiPitch': json.loads(tk.getMIDIValuesForElement(y))['pitch']
-    }}), x['on'])), timemapNoteOns))
-allNotesJson = json.dumps(allNotes)
-print('Python: Done...')
-")
-
-attrsJson <- py_run_string(generateAttrsPython)$allNotesJson
-attrs <- parse_json(attrsJson, simplifyVector = TRUE)
+verovioJsonRaw <- read_file(verovioNotesJsonFile)
+attrs <- fromJSON(verovioJsonRaw, simplifyVector = TRUE)
 
 # do the actual work
 generateMapsResultJson(correspFile, attrs, outputFile)
