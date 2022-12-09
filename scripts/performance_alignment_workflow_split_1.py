@@ -3,9 +3,9 @@ import os
 import subprocess
 import sys
 
+import verovio_midi
 from midi_to_mp3 import midi_to_mp3
 from smat_align import smat_align
-import verovio_midi
 
 
 def perform_workflow_split_1(performance_midi, canonical_midi, mei_file, tempdir, audio_fname, maps_fname):

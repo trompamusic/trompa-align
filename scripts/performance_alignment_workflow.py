@@ -1,18 +1,24 @@
-import os, sys, argparse, csv, uuid, requests, json
-from mei_to_midi import mei_to_midi
-from midi_to_mp3 import midi_to_mp3 
-from smat_align import smat_align
-from convert_to_rdf import maps_result_to_graph, graph_to_jsonld
+import json
+import os
+import requests
 import subprocess
+import sys
+
+from convert_to_rdf import maps_result_to_graph, graph_to_jsonld
+from mei_to_midi import mei_to_midi
+from midi_to_mp3 import midi_to_mp3
+from smat_align import smat_align
 
 # TODO UPDATE CLI in align-directly.ini line 24
 
 PYTHON_VERSION = "python3"
 
-def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container, audio_container, webid, tempdir, perf_fname, audio_fname): 
+
+def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container,
+                     audio_container, webid, tempdir, perf_fname, audio_fname):
     if mei_file is not None:
         with open(mei_file, 'r') as f:
-          mei_data = f.read()
+            mei_data = f.read()
     else:
         resp = requests.get(mei_uri)
         mei_data = resp.text
@@ -32,8 +38,8 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     exp = expansion if bool(expansion) else ""
     subprocess.run([
         "Rscript",
-        os.path.join(sys.path[0], "trompa-align.R"), 
-        os.path.join(tempdir, "corresp.txt"), 
+        os.path.join(sys.path[0], "trompa-align.R"),
+        os.path.join(tempdir, "corresp.txt"),
         os.path.join(tempdir, "maps.json"),
         mei_file,
         exp
@@ -47,9 +53,9 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     with open(os.path.join(tempdir, "maps.json"), 'rb') as f:
         maps_json = f.read()
     g = maps_result_to_graph(
-        maps_json, 
-        structure_uri, 
-        mei_uri, 
+        maps_json,
+        structure_uri,
+        mei_uri,
         os.path.join(performance_container, perf_fname),
         structure_uri,
         os.path.join(audio_container, audio_fname),

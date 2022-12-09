@@ -1,33 +1,42 @@
-import os, sys, argparse, csv, uuid, requests, json, tempfile, pathlib
+import argparse
+import logging
+import os
+import pathlib
+import requests
+import subprocess
+import sys
+import tempfile
+from datetime import datetime
+
+from mei_to_midi import mei_to_midi
 from smat_align import smat_align
 from write_expanded_mei_data import write_expanded_mei_data
-from mei_to_midi import mei_to_midi
-from datetime import datetime
-import subprocess
-import logging
+
 
 def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
     # fetch MEI
     resp = requests.get(mei_uri)
     mei_data = resp.text
-    [process(performance_midi_file, mei_uri, expansions, outdir, tempdir, mei_data) for performance_midi_file in midi_files]
+    [process(performance_midi_file, mei_uri, expansions, outdir, tempdir, mei_data) for performance_midi_file in
+     midi_files]
+
 
 def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
-    logging.basicConfig( 
-            filename="log-" + datetime.now().isoformat() + ".log", 
-            encoding="utf-8", level=logging.DEBUG, 
-            format='%(asctime)s %(message)s', 
-            datefmt='%m/%d/%Y %I:%M:%S %p')
+    logging.basicConfig(
+        filename="log-" + datetime.now().isoformat() + ".log",
+        encoding="utf-8", level=logging.DEBUG,
+        format='%(asctime)s %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p')
     corresp_file = os.path.join(tempdir, midi.name) + ".corresp"
     fewest_inserted_notes = None
     best_expansion = None
     logging.debug("Processing: " + midi.name)
     for expansion in expansions:
         logging.debug("- Expansion: " + expansion)
-        try: 
+        try:
             mei_file = pathlib.Path(
-                    outdir,
-                    pathlib.Path(mei_uri).stem + "." + expansion + ".mei")
+                outdir,
+                pathlib.Path(mei_uri).stem + "." + expansion + ".mei")
             canonical = pathlib.Path(tempdir, expansion + ".canonical.mid")
             if not mei_file.is_file():
                 logging.debug("  writing expanded mei data")
@@ -44,7 +53,7 @@ def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
             logging.debug("  performing MEI reconciliation")
             inserted_notes_output = subprocess.check_output([
                 "Rscript",
-                os.path.join(sys.path[0], "trompa-align-local.R"), 
+                os.path.join(sys.path[0], "trompa-align-local.R"),
                 corresp_file,
                 maps_file,
                 mei_uri,
@@ -68,14 +77,18 @@ def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
             break
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--performancedir', help="Directory containing performance MIDI files", required=True)
     parser.add_argument('-m', '--meiuri', help="URI of MEI file being performed", required=True)
-    parser.add_argument('-o', '--outputdir', help="Directory to which output maps.json should be written", required=True)
-    parser.add_argument('-e', '--expansion', help="Specify a particular Verovio expansion option (overrides standardExpansions)", required=False)
-    parser.add_argument('-s', '--standardexpansions', help="Try expansion-default and expansion-minimal, proceed with best one", dest="standard_expansions", action='store_true')
+    parser.add_argument('-o', '--outputdir', help="Directory to which output maps.json should be written",
+                        required=True)
+    parser.add_argument('-e', '--expansion',
+                        help="Specify a particular Verovio expansion option (overrides standardExpansions)",
+                        required=False)
+    parser.add_argument('-s', '--standardexpansions',
+                        help="Try expansion-default and expansion-minimal, proceed with best one",
+                        dest="standard_expansions", action='store_true')
     args = parser.parse_args()
     tempdir = tempfile.mkdtemp()
     print("Tempdir: ", tempdir)
@@ -83,14 +96,8 @@ if __name__ == '__main__':
         expansions = ["expansion-default", "expansion-minimal"]
     elif args.expansion:
         expansions = [args.expansion]
-    else: 
+    else:
         expansions = ["expansion-default"]
     midi_files = [path for path in pathlib.Path(args.performancedir).rglob('*.mid')]
     print("About to start processing with expansions: ", expansions)
     batch_process(midi_files, args.meiuri, expansions, args.outputdir, tempdir)
-
-    
-
-    
-
-

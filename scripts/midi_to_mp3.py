@@ -1,8 +1,11 @@
 #!/usr/bin/python
+import argparse
+import os
+import tempfile
+
 from midi2audio import FluidSynth
 from pydub import AudioSegment
-import tempfile
-import argparse, uuid, os 
+
 
 def midi_to_mp3(midifile, output, tempdir):
     tempfile = os.path.join(tempdir, "synthAudio.wav")
@@ -11,10 +14,10 @@ def midi_to_mp3(midifile, output, tempdir):
     wav = AudioSegment.from_file(tempfile, format="wav")
     wav.export(output, format="mp3")
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--midiFile', '-m', help="Path to a MIDI file", required=True)
     parser.add_argument('--output', '-o', help="Name of output MP3 file to generate", required=True)
     args = parser.parse_args()
     midi_to_mp3(args.midiFile, args.output, tempfile.mkdtemp())
-

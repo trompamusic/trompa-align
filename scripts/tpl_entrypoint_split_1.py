@@ -1,41 +1,50 @@
-import argparse, tempfile, requests, os, uuid
+import argparse
+import json
+import os
+import requests
+import tempfile
+
 from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
 from trompasolid import client
-from performance_alignment_workflow_split_1 import perform_workflow_split_1
+
 from mei_to_midi import mei_to_midi
-import json
+from performance_alignment_workflow_split_1 import perform_workflow_split_1
 
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
 REDIS_HOST = os.environ.get("TPL_AUTH_REDIS_HOST", "localhost")
 
+
 def main(performance_midi, score_midi, audio_fname, tempdir):
     # build args object
     perform_workflow_split_1(
-        os.path.join(tempdir, "performanceMidi.mid"), # performance_midi
+        os.path.join(tempdir, "performanceMidi.mid"),  # performance_midi
         score_midi,
-        os.path.join(tempdir, "score.mei"),           # mei_file
-        tempdir,                                       # tempdir
+        os.path.join(tempdir, "score.mei"),  # mei_file
+        tempdir,  # tempdir
         audio_fname
     )
+
 
 def main(performance_midi, score_midi, mei_file, audio_fname, tempdir, maps_fname):
     # build args object
     perform_workflow_split_1(
-        performance_midi, # performance_midi
+        performance_midi,  # performance_midi
         score_midi,
-        mei_file,           # mei_file
-        tempdir,                                       # tempdir
+        mei_file,  # mei_file
+        tempdir,  # tempdir
         audio_fname,
         maps_fname
     )
+
 
 def read_from_solid(webid, uri, contenttype):
     client.init_redis(REDIS_HOST)
     identity_provider = lookup_provider_from_profile(webid)
     bearer = client.get_bearer_for_user(identity_provider, webid)
     return requests.get(uri, headers={"authorization": "Bearer %s" % bearer, "content-type": contenttype})
+
 
 def lookup_provider_from_profile(webid):
     r = requests.options(webid)
@@ -46,16 +55,17 @@ def lookup_provider_from_profile(webid):
             if l.get('rel') == 'http://openid.net/specs/connect/1.0/issuer':
                 return l['url']
 
+
 def webmidi_to_midi(webmidi_json, tempdir):
     midiNotes = webmidi_json
     midiFile = MidiFile()
     midiFile.ticks_per_beat = ticks_per_beat
-        
+
     track = MidiTrack()
     midiFile.tracks.append(track)
 
-    prevTime = midiNotes[0]["timestamp"] 
-    
+    prevTime = midiNotes[0]["timestamp"]
+
     for note in midiNotes:
         # write into MIDI file with seconds2ticks for timestamp
         try:
@@ -67,13 +77,13 @@ def webmidi_to_midi(webmidi_json, tempdir):
 
             print("code: ", code, "channel: ", channel, "key: ", key, "vel: ", velocity)
 
-            time = round(second2tick((note["timestamp"]-prevTime)/1000, ticks_per_beat=ticks_per_beat, tempo=tempo))
+            time = round(second2tick((note["timestamp"] - prevTime) / 1000, ticks_per_beat=ticks_per_beat, tempo=tempo))
             if code == 0b001:
                 eventType = "note_on"
                 track.append(Message(eventType, channel=0, note=key, velocity=velocity, time=time))
                 print("APPEND NOTE ON: ", eventType, 0, key, velocity, time)
                 prevTime = note["timestamp"]
-            elif code == 0b000:# or code == 0b0000:
+            elif code == 0b000:  # or code == 0b0000:
                 eventType = "note_off"
                 track.append(Message(eventType, channel=0, note=key, velocity=velocity, time=time))
                 print("APPEND NOTE OFF: ", eventType, 0, key, velocity, time)
@@ -85,22 +95,23 @@ def webmidi_to_midi(webmidi_json, tempdir):
                 prevTime = note["timestamp"]
             elif code == 0b010:
                 eventType = "polytouch"
-                #track.append(Message(eventType, channel=0, note=key, value=velocity, time=time))
+                # track.append(Message(eventType, channel=0, note=key, value=velocity, time=time))
             elif code == 0b101:
                 eventType = "aftertouch"
-                #track.append(Message(eventType, channel=0, value=key, time=time))
+                # track.append(Message(eventType, channel=0, value=key, time=time))
             elif code == 0b110:
                 eventType = "pitchwheel"
-                #track.append(Message(eventType, channel=0, pitch=key, time=time))
+                # track.append(Message(eventType, channel=0, pitch=key, time=time))
             elif code == 0b111:
                 eventType = "sysex"
-                #track.append(Message(eventType, data=(key, velocity), time=time))
+                # track.append(Message(eventType, data=(key, velocity), time=time))
             else:
                 print("webmidi_to_midi: UNKNOWN CODE WAS ", code)
             print("webmidi_to_midi: EVENT TYPE: ", eventType);
         except ValueError as e:
             print("webmidi_to_midi: Problem with: ", note, e)
     midiFile.save(os.path.join(tempdir, "performanceMidi.mid"))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -117,13 +128,13 @@ if __name__ == '__main__':
     f.close(
 
     )
-  #  performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
-    performance_data = open(args.performance,'r').read()
+    #  performance_data = read_from_solid(args.webId, args.performanceMidiUri, "application/ld+json").json()
+    performance_data = open(args.performance, 'r').read()
     performance_data = json.loads(performance_data)
     webmidi_to_midi(performance_data, tempdir)
-    mei_to_midi(mei_data, os.path.join(tempdir,"meiMidi.mid"), False)
-    performance_midi = os.path.join(tempdir,"performanceMidi.mid")
-    score_midi = os.path.join(tempdir,"meiMidi.mid")
+    mei_to_midi(mei_data, os.path.join(tempdir, "meiMidi.mid"), False)
+    performance_midi = os.path.join(tempdir, "performanceMidi.mid")
+    score_midi = os.path.join(tempdir, "meiMidi.mid")
     mei_file = args.mei
 
     audio_fname = args.audio

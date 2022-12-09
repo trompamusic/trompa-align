@@ -1,5 +1,6 @@
-import verovio
 import json
+
+import verovio
 
 
 def generate_notes_from_mei(mei_file, expansion):
@@ -27,7 +28,6 @@ def generate_notes_from_mei(mei_file, expansion):
         'id': y,
         'tstamp': x['tstamp'],
         'midiPitch': tk.getMIDIValuesForElement(y)['pitch']
-        }), x['on'])), timemapNoteOns))
+    }), x['on'])), timemapNoteOns))
 
     return allNotes
-

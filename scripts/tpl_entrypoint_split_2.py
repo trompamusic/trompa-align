@@ -1,6 +1,6 @@
-import argparse, tempfile, requests, os, uuid
-from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
+import argparse, tempfile, requests, os
 from performance_alignment_workflow_split_2 import perform_workflow_split_2
+
 
 def main(mei_uri, structure_uri, performance_uri, audio_uri, maps, output):
     # build args object
@@ -12,6 +12,7 @@ def main(mei_uri, structure_uri, performance_uri, audio_uri, maps, output):
         maps,
         output
     )
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

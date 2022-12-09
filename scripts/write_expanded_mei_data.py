@@ -1,6 +1,13 @@
-import sys, argparse, urllib.parse, requests
-import verovio,json
+import argparse
+import requests
+import sys
+
+import json
+import verovio
+
 verovio.enableLog(False)
+
+
 def write_expanded_mei_data(mei, fname, expansion):
     vrv = verovio.toolkit()
     if bool(expansion):
@@ -9,7 +16,8 @@ def write_expanded_mei_data(mei, fname, expansion):
     print("writing mei to: ", fname)
     vrv.saveFile(fname)
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--meiUri', '-u', help="URI of a publicly accessible MEI file", required=False)
     parser.add_argument('--meiFile', '-m', help="Path to an MEI file", required=False)
@@ -22,14 +30,13 @@ if __name__ == "__main__":
     if not bool(output):
         sys.exit("Please supply an --output file name for your MIDI file")
     if bool(meiUri) and bool(meiFile):
-       sys.exit("Please specify EITHER --meiUri OR --meiFile")
+        sys.exit("Please specify EITHER --meiUri OR --meiFile")
     elif not (bool(meiUri) or bool(meiFile)):
-       sys.exit("Please specify EITHER --meiUri OR --meiFile")
-    if bool(meiFile): 
+        sys.exit("Please specify EITHER --meiUri OR --meiFile")
+    if bool(meiFile):
         with open(meiFile, 'r') as f:
-          data = f.read()
+            data = f.read()
     else:
         resp = requests.get(meiUri)
         data = resp.text
     write_expanded_mei_data(data, output, args.expansion)
-

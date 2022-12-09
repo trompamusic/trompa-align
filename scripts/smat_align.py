@@ -1,6 +1,11 @@
-import os, sys, shutil, argparse, uuid, glob
+import argparse
+import glob
+import os
+import shutil
 import subprocess
+import sys
 import tempfile
+import uuid
 
 
 def smat_align(file1, file2):
@@ -57,17 +62,20 @@ def smat_align(file1, file2):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--canonicalMIDI', '-c', help="Absolute path to a canonical MIDI file (e.g., generated from MEI)", required=True)
-    parser.add_argument('--performanceMIDI', '-p', help="Absolute path to a MIDI file recording a performance", required=True)
-    parser.add_argument('--SMAT', '-s', help="Absolute path of unzipped Symbolic Music Alignment Tool directory", required=True)
+    parser.add_argument('--canonicalMIDI', '-c',
+                        help="Absolute path to a canonical MIDI file (e.g., generated from MEI)", required=True)
+    parser.add_argument('--performanceMIDI', '-p', help="Absolute path to a MIDI file recording a performance",
+                        required=True)
+    parser.add_argument('--SMAT', '-s', help="Absolute path of unzipped Symbolic Music Alignment Tool directory",
+                        required=True)
     parser.add_argument('--out', '-o', help="Absolute path of corresp file to generate as output", required=True)
     args = parser.parse_args()
 
-    if not(
-        os.path.isabs(args.canonicalMIDI) and
-        os.path.isabs(args.performanceMIDI) and
-        os.path.isabs(args.SMAT)
-        ):
+    if not (
+            os.path.isabs(args.canonicalMIDI) and
+            os.path.isabs(args.performanceMIDI) and
+            os.path.isabs(args.SMAT)
+    ):
         sys.exit("Please supply all parameters as absolute paths")
     # SMAT expects MIDI files to live inside the SMAT directory.
     # Copy them over there temporarily, do the alignment, then delete the tmp files
@@ -83,11 +91,11 @@ if __name__ == "__main__":
     mainDir = os.getcwd()
     os.chdir(smatPath)
     os.system("./MIDIToMIDIAlign.sh {c} {p}"
-        .format(
-            SMAT = args.SMAT,
-            c = tmpUuid + "canonical",
-            p = tmpUuid + "performance"
-        )
+    .format(
+        SMAT=args.SMAT,
+        c=tmpUuid + "canonical",
+        p=tmpUuid + "performance"
+    )
     )
     # Hopefully SMAT has generated a corresp file, along with a bunch of other stuff
     # We only need the corresp file. Copy it out to our output path
@@ -105,7 +113,3 @@ if __name__ == "__main__":
             os.remove(f)
         except:
             print("Error while tidying up: Couldn't delete ", f)
-
-
-
-
