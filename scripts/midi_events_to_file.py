@@ -8,29 +8,16 @@ from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--midiJson', '-j', help="JSON file containing MIDI event data received from client",
-                        required=True)
-    parser.add_argument('--output', '-o', help="Name of output MIDI file to generate", required=True)
-    args = parser.parse_args()
-    midiJson = args.midiJson
-    output = args.output
-
-    with open(midiJson, 'r') as j:
-        midiBatchJson = j.read()
-    midiBatch = json.loads(midiBatchJson)
-    #    midiNotes = list(filter(lambda e: e["data"]["_messageCode"] in codesToInclude, midiBatch))
-    midiNotes = midiBatch
+def midi_json_to_midi(midi_notes):
     midiFile = MidiFile()
     midiFile.ticks_per_beat = ticks_per_beat
 
     track = MidiTrack()
     midiFile.tracks.append(track)
 
-    prevTime = midiNotes[0]["timestamp"]
+    prevTime = midi_notes[0]["timestamp"]
 
-    for note in midiNotes:
+    for note in midi_notes:
         # write into MIDI file with seconds2ticks for timestamp
         try:
             eventType = "UNKNOWN"
@@ -71,7 +58,22 @@ if __name__ == "__main__":
                 # track.append(Message(eventType, data=(key, velocity), time=time))
             else:
                 print("UNKNOWN CODE WAS ", code)
-            print("EVENT TYPE: ", eventType);
+            print("EVENT TYPE: ", eventType)
         except ValueError as e:
             print("Problem with: ", note, e)
-    midiFile.save(output)
+
+    return midiFile
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('midiJson', help="JSON file containing MIDI event data received from client")
+    parser.add_argument('output', help="Name of output MIDI file to generate")
+    args = parser.parse_args()
+    output = args.output
+
+    with open(args.midiJson, 'r') as fp:
+        midi_notes = json.load(fp)
+
+    midi = midi_json_to_midi(midi_notes)
+    midi.save(args.output)
