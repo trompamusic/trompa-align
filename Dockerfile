@@ -20,8 +20,8 @@ RUN unzip /smat/smat.zip -d /smat \
 RUN mkdir /code
 WORKDIR /code
 
-COPY ./scripts/install-packages.R /code/scripts/
-RUN Rscript /code/scripts/install-packages.R
+COPY ./install-packages.R /code
+RUN Rscript /code/install-packages.R
 
 COPY requirements.txt /code
 RUN pip install --no-cache-dir -r requirements.txt
