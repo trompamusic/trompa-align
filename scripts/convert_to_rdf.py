@@ -260,9 +260,7 @@ if __name__ == "__main__":
     parser.add_argument('--maps', '-m', help="Path to MAPS result file", required=False)
     parser.add_argument('--segmentlineUri', '-s', help="Score segmentline URI", required=False)
     parser.add_argument('--timelineUri', '-t', help="Performance timeline URI", required=False)
-    parser.add_argument('--format', '-f',
-                        help="Output format type (ttl, jsonld, both, tpl). tpl will generate a jsonld file without adding a .jsonld suffix to the filename.",
-                        required=True)
+    parser.add_argument('--format', '-f', help="Output format type (ttl, jsonld, both)", required=True)
     parser.add_argument('--timelineOutput', '-o',
                         help="Performance timeline output file name (will be suffixed with .ttl or .jsonld",
                         required=False)
@@ -324,7 +322,7 @@ if __name__ == "__main__":
         performances = performances_to_graphs(performancesFile, segUri, meiUri, tlUri, recordingUri, performancesUri,
                                               worksUri)
         for perf in performances:
-            if (outputFormat == 'ttl' or outputFormat == 'both'):
+            if outputFormat == 'ttl' or outputFormat == 'both':
                 perfTtl = graph_to_turtle(perf["performance"])
                 with open("performance/" + perf["performanceID"] + ".ttl", "w") as ttl_file:
                     ttl_file.write(perfTtl)
@@ -334,8 +332,8 @@ if __name__ == "__main__":
                     ttl_file.write(tlTtl)
                     print("Performance description (turtle) written: timeline/" + perf["performanceID"] + ".ttl")
 
-            if (outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
-                extension = '' if outputFormat == 'tpl' else '.jsonld'
+            if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
+                extension = '.jsonld'
                 perfJsonld = json.dumps(graph_to_jsonld(perf["performance"], extension), indent=2)
                 with open("performance/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(perfJsonld)
@@ -359,14 +357,13 @@ if __name__ == "__main__":
                     sys.exit()
                 g = maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri,
                                          includePerformance)
-                if (outputFormat == 'ttl' or outputFormat == 'both'):
+                if outputFormat == 'ttl' or outputFormat == 'both':
                     ttl = graph_to_turtle(g)
                     with open(outputFName + ".ttl", "w") as ttl_file:
                         ttl_file.write(ttl.decode("utf-8"))
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
-                if (
-                        outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
-                    extension = '' if outputFormat == 'tpl' else '.jsonld'
+                if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
+                    extension = '.jsonld'
                     jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
                     with open(outputFName + extension, "w") as json_file:
                         json_file.write(jsonld)
@@ -380,13 +377,12 @@ if __name__ == "__main__":
                 "You must provide --segmentlineOutput, --segmentlineUri, and --meiUri when a MEI file is specified")
         seg_data = generate_structural_segmentation(meiFile)
         g = segmentation_to_graph(seg_data, segUri, meiUri)
-        if (outputFormat == 'ttl' or outputFormat == 'both'):
+        if outputFormat == 'ttl' or outputFormat == 'both':
             ttl = graph_to_turtle(g)
             with open(segmentlineOutput + ".ttl", "w") as ttl_file:
                 ttl_file.write(ttl)
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
-        if (outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'tpl' or outputFormat == 'both'):
-            extension = '' if outputFormat == 'tpl' else '.jsonld'
+        if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
             jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
             with open(segmentlineOutput + extension, "w") as json_file:
                 json_file.write(jsonld)
