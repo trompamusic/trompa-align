@@ -4,14 +4,11 @@ import requests
 import subprocess
 import sys
 
-from convert_to_rdf import maps_result_to_graph, graph_to_jsonld
-from mei_to_midi import mei_to_midi
-from midi_to_mp3 import midi_to_mp3
-from smat_align import smat_align
-
-# TODO UPDATE CLI in align-directly.ini line 24
-
-PYTHON_VERSION = "python3"
+from .convert_to_rdf import maps_result_to_graph, graph_to_jsonld
+from .mei_to_midi import mei_to_midi
+from .midi_to_mp3 import midi_to_mp3
+from . import verovio_midi
+from .smat_align import smat_align
 
 
 def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container,
@@ -34,15 +31,18 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     with open(os.path.join(tempdir, "corresp.txt"), 'w') as out:
         out.write(corresp)
 
+    allNotes = verovio_midi.generate_notes_from_mei(mei_file, None)
+    verovio_json_notes = os.path.join(tempdir, "verovio_note_positions.json")
+    with open(verovio_json_notes, "w") as fp:
+        json.dump(allNotes, fp)
+
     print("** Performing RECONCILIATION")
-    exp = expansion if bool(expansion) else ""
     subprocess.run([
         "Rscript",
         os.path.join(sys.path[0], "trompa-align.R"),
         os.path.join(tempdir, "corresp.txt"),
         os.path.join(tempdir, "maps.json"),
-        mei_file,
-        exp
+        verovio_json_notes,
     ])
 
     print("** Performing AUDIO SYNTHESIS")
