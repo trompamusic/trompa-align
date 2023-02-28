@@ -1,5 +1,3 @@
-import json
-
 import verovio
 
 
@@ -20,7 +18,7 @@ def generate_notes_from_mei(mei_file, expansion):
     tk.renderToMIDI()
     print('Python: Rendering to Timemap')
 
-    timemap = json.loads(tk.renderToTimemap())
+    timemap = tk.renderToTimemap()
     allNotes = []
     timemapNoteOns = list(filter(lambda x: 'on' in x, timemap))
 
