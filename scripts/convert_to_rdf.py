@@ -154,7 +154,7 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
 
 
 def graph_to_jsonld(g, extension):
-    return json.loads(g.serialize(format='json-ld').decode("utf8").replace(formatPlaceholder, extension))
+    return json.loads(g.serialize(format='json-ld').replace(formatPlaceholder, extension))
 
 
 def graph_to_turtle(g):
