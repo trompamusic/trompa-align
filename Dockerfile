@@ -24,6 +24,6 @@ COPY ./install-packages.R /code
 RUN Rscript /code/install-packages.R
 
 COPY requirements.txt /code
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache pip install -r requirements.txt
 
 COPY . /code

@@ -5,6 +5,7 @@ Flask-Cors==3.0.10
 flask-redis==0.4.0
 flask-shell-ipython==0.4.1
 Flask-SQLAlchemy==3.0.3
+fluent-logger==0.10.0
 ipython==7.34.0
 jwcrypto==1.4.2
 lxml==4.9.2
@@ -17,6 +18,7 @@ python-dotenv==0.21.1
 rdflib==6.2.0
 redis==4.5.1
 requests==2.28.2
+sentry-sdk[flask]==1.16.0
 SQLAlchemy==2.0.3
 git+https://github.com/trompamusic/solid-oidc-app-permission.git@ffe3194#egg=trompa_solid
 verovio==3.14.0

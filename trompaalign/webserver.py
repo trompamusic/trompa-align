@@ -1,9 +1,12 @@
 import flask
 from celery import Celery, Task
-from flask import jsonify, Flask
+from flask import jsonify, Flask, request
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
 
-from trompaalign import extensions
-
+from trompaalign import extensions, tasks
+from trompaalign import log
 from trompasolid import client
 
 
@@ -17,7 +20,6 @@ def celery_init_app(app: Flask) -> Celery:
     celery_app.config_from_object(app.config["CELERY"])
     celery_app.autodiscover_tasks(['trompaalign'], force=True)
     celery_app.set_default()
-    print(celery_app.tasks)
     app.extensions["celery"] = celery_app
     return celery_app
 
@@ -30,7 +32,18 @@ def create_app():
     extensions.backend.init_app(app)
     client.set_backend(extensions.db.session)
 
+    if app.config['SENTRY_DSN']:
+        sentry_sdk.init(
+            dsn=app.config['SENTRY_DSN'],
+            integrations=[
+                FlaskIntegration(),
+                CeleryIntegration(),
+            ],
+            traces_sample_rate=1.0
+        )
+
     celery_init_app(app)
+    log.logger.info("Webapp started")
     return app
 
 
