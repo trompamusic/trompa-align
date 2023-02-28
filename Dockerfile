@@ -1,4 +1,4 @@
-FROM python:3.7
+FROM python:3.10
 
 #install dependencies (R, python, wget, unzip)
 RUN apt-get update \
