@@ -6,7 +6,7 @@ flask-redis==0.4.0
 flask-shell-ipython==0.4.1
 Flask-SQLAlchemy==3.0.3
 fluent-logger==0.10.0
-ipython==7.34.0
+ipython==8.10.0
 jwcrypto==1.4.2
 lxml==4.9.2
 midi2audio==0.1.1
