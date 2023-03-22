@@ -12,7 +12,7 @@ from .smat_align import smat_align
 
 
 def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container,
-                     audio_container, webid, tempdir, perf_fname, audio_fname):
+                     audio_container, tempdir, perf_fname, audio_fname):
     if mei_file is not None:
         with open(mei_file, 'r') as f:
             mei_data = f.read()

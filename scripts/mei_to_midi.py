@@ -9,7 +9,7 @@ import verovio
 verovio.enableLog(False)
 
 
-def mei_to_midi(mei, fname, expansion):
+def mei_to_midi(mei, fname, expansion=None):
     vrv = verovio.toolkit()
     if bool(expansion):
         vrv.setOption('expand', expansion)
