@@ -11,7 +11,7 @@ from trompaalign import extensions, tasks
 from trompaalign import log
 from trompasolid import client
 
-from trompaalign.solid import SolidError
+from trompaalign.solid import SolidError, lookup_provider_from_profile
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -34,6 +34,7 @@ def create_app():
     extensions.db.init_app(app)
     extensions.redis_client.init_app(app)
     extensions.backend.init_app(app)
+    extensions.cors.init_app(app)
     client.set_backend(DBBackend(extensions.db.session))
 
     if app.config['SENTRY_DSN']:
@@ -58,6 +59,19 @@ webserver_bp = flask.Blueprint('trompaalign', __name__)
 def index():
     return jsonify({"status": "ok"})
 
+
+@webserver_bp.route("/check_user_perms")
+def check_user_perms():
+    """Check if the given user has permissions in the backend to """
+    profile_url = request.args.get("profile")
+    if not profile_url:
+        return jsonify({"status": "error"}), 400
+
+    provider = lookup_provider_from_profile(profile_url)
+    configuration = extensions.backend.backend.get_configuration_token(issuer=provider, profile=profile_url)
+    has_permission = configuration is not None
+
+    return jsonify({"has_permission": has_permission})
 
 @webserver_bp.route("/add/status")
 def add_score_status():
@@ -84,9 +98,9 @@ def add_score_status():
 
 @webserver_bp.route("/add", methods=["POST"])
 def add_score():
-    score_url = request.values.get("score")
-    title = request.values.get("title")
-    profile = request.values.get("profile")
+    score_url = request.json.get("score")
+    title = request.json.get("title")
+    profile = request.json.get("profile")
 
     if not score_url:
         return jsonify({"status": "error", "message": "Missing `score` parameter"}), 400

@@ -13,6 +13,20 @@ from .smat_align import smat_align
 
 def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container,
                      audio_container, tempdir, perf_fname, audio_fname):
+    """Do an alignment of a performance vs the score
+
+    :param performance_midi: path to midi file of the performance
+    :param mei_file: path to mei file
+    :param expansion: which expansion to perform (None for all, or a specific number)
+    :param mei_uri: url of the external MEI file which is being performed
+    :param structure_uri: URL of the structure URL defining the mei and describing the score
+    :param performance_container: Location of a container in user's solid pod, where data for this performance will be
+    :param audio_container: Location of a container in the user's pod where the audio will be
+    :param tempdir: temporary working directory to put files
+    :param perf_fname: basename of the resource in performance_container
+    :param audio_fname: basename of the resource in audio_container
+    :return:
+    """
     if mei_file is not None:
         with open(mei_file, 'r') as f:
             mei_data = f.read()
@@ -39,7 +53,7 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     print("** Performing RECONCILIATION")
     subprocess.run([
         "Rscript",
-        os.path.join(sys.path[0], "trompa-align.R"),
+        os.path.join(os.path.dirname(__file__), "trompa-align.R"),
         os.path.join(tempdir, "corresp.txt"),
         os.path.join(tempdir, "maps.json"),
         verovio_json_notes,
@@ -52,6 +66,7 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     print("** Performing RDF CONVERSION")
     with open(os.path.join(tempdir, "maps.json"), 'rb') as f:
         maps_json = f.read()
+
     g = maps_result_to_graph(
         maps_json,
         structure_uri,
@@ -61,7 +76,7 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
         os.path.join(audio_container, audio_fname),
         True
     )
-    jsonld = json.dumps(graph_to_jsonld(g, ''), indent=2)
+    jsonld = json.dumps(graph_to_jsonld(g), indent=2)
     with open(os.path.join(tempdir, perf_fname), 'w') as json_file:
         json_file.write(jsonld)
     print("** Success: Created timeline output: ", os.path.join(tempdir, perf_fname))

@@ -1,3 +1,4 @@
+from flask_cors import CORS
 from flask_redis import FlaskRedis
 from flask_sqlalchemy import SQLAlchemy
 from trompasolid.backend import SolidBackend
@@ -22,3 +23,4 @@ class BackendExtension:
 db = SQLAlchemy()
 redis_client = FlaskRedis()
 backend = BackendExtension()
+cors = CORS()

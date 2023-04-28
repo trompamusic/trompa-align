@@ -2,7 +2,9 @@ FROM python:3.10
 
 #install dependencies (R, python, wget, unzip)
 RUN apt-get update \
-    && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm fluid-soundfont-gs tzdata wget git unzip make r-base \
+    && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm \
+    fluid-soundfont-gs tzdata wget git unzip make r-base \
+    libharfbuzz-dev libfribidi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /usr/share/soundfonts

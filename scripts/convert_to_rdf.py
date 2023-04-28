@@ -11,8 +11,6 @@ from uuid import uuid4
 from lxml import etree as ET
 from rdflib import Graph
 
-formatPlaceholder = "____MAPS-FORMAT"
-
 
 def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance):
     maps_result = json.loads(maps_result_json)
@@ -108,7 +106,7 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
                 "performance": performance_to_graph(row, tlUri, recordingUri, performancesUri, worksUri),
                 # generate timeline RDF
                 "timeline": maps_result_to_graph(maps_result_json, segUri, meiUri,
-                                                 tlUri + "/" + row["PerformanceID"] + formatPlaceholder, False),
+                                                 tlUri + "/" + row["PerformanceID"], False),
                 "performanceID": row["PerformanceID"]
             })
 
@@ -126,15 +124,15 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
 @prefix mo: <http://purl.org/ontology/mo/> .
 
-<{perfPath}/{performanceID}{formatPlaceholder}> a mo:Performance ;
-    mo:performance_of <{worksUri}/{pieceLabel}{formatPlaceholder}> ;
-    mo:recorded_as <{perfPath}/{performanceID}{formatPlaceholder}#Signal> ;
+<{perfPath}/{performanceID}> a mo:Performance ;
+    mo:performance_of <{worksUri}/{pieceLabel}> ;
+    mo:recorded_as <{perfPath}/{performanceID}#Signal> ;
     meld:offset "{offset}" ;
     rdfs:label "{firstName} {lastName} - {pieceLabel}" .
 
-<{perfPath}/{performanceID}{formatPlaceholder}#Signal> mo:available_as <{recordingUri}/{media}> ;
+<{perfPath}/{performanceID}#Signal> mo:available_as <{recordingUri}/{media}> ;
     mo:time [ a tl:Interval ;
-    tl:onTimeLine <{perftl}/{performanceID}{formatPlaceholder}>
+    tl:onTimeLine <{perftl}/{performanceID}>
 ] .
 """.format(
         perftl=tlUri,
@@ -147,20 +145,17 @@ def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksU
         media=urllib.parse.quote(perf_dict["mediaName"]),
         perfPath=performancesUri,
         worksUri=worksUri,
-        offset=perf_dict["mediaOffset"],
-        formatPlaceholder=formatPlaceholder
+        offset=perf_dict["mediaOffset"]
     )
     return Graph().parse(data=rdf, format='n3')
 
 
-def graph_to_jsonld(g, extension):
-    return json.loads(g.serialize(format='json-ld').replace(formatPlaceholder, extension))
+def graph_to_jsonld(g):
+    return json.loads(g.serialize(format='json-ld'))
 
 
 def graph_to_turtle(g):
-    n3String = g.serialize(format='n3').decode("utf8")
-    n3String = n3String.replace(formatPlaceholder, ".ttl")
-    return n3String
+    return g.serialize(format='n3')
 
 
 def generate_structural_segmentation(meiFile):
@@ -205,28 +200,28 @@ def generate_structural_segmentation(meiFile):
     return first_note_per_section
 
 
-def segmentation_to_graph(seg_data, segUri, meiUri):
+def segmentation_to_graph(seg_data, segUri, meiUri, title):
     rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
 @prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix meld: <https://meld.linkedmusic.org/terms/> .
-@prefix struct: <http://localhost:8080/structure/> .
-@prefix WoO80: <http://localhost:8080/segment/WoO80/> .
-@base <{segUri}{formatPlaceholder}> .
+@base <{segUri}> .
 
 <{meiUri}> a mo:PublishedScore .
 
 <> a mo:Score ;
     mo:published_as <{meiUri}> ;
-    meld:segments <{segUri}{formatPlaceholder}#segmentation> .
+    dcterms:title "{title}" ;
+    meld:segments <{segUri}#segmentation> .
 
-<{segUri}{formatPlaceholder}#segmentation> a so:SegmentLine .
-    """.format(segUri=segUri, meiUri=meiUri, formatPlaceholder=formatPlaceholder)
+<{segUri}#segmentation> a so:SegmentLine .
+    """.format(segUri=segUri, meiUri=meiUri, title=title)
     for ix, seg in enumerate(seg_data):
         rdf += """<#{segId}> a so:Segment ; 
-    so:onSegmentLine <{segUri}{formatPlaceholder}#segmentation> ;
+    so:onSegmentLine <{segUri}#segmentation> ;
     meld:order "{ix}" ;
     frbr:embodiment [ a meld:MEIManifestation, rdf:Bag ;
     rdfs:member <{sectionId}> ;
@@ -239,7 +234,6 @@ def segmentation_to_graph(seg_data, segUri, meiUri):
             ix=ix,
             segUri=segUri,
             segId=seg,
-            formatPlaceholder=formatPlaceholder,
             sectionId=meiUri + "#" + seg,
             first="<" + meiUri + "#" + seg_data[seg]["first"] + ">",
             last="<" + meiUri + "#" + seg_data[seg]["last"] + ">",
