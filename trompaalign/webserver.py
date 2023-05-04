@@ -1,7 +1,8 @@
+import os
 import flask
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import jsonify, Flask, request
+from flask import jsonify, Flask, request, send_from_directory
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -29,7 +30,7 @@ def celery_init_app(app: Flask) -> Celery:
 
 
 def create_app():
-    app = flask.Flask(__name__)
+    app = flask.Flask(__name__, static_folder="/clara/static")
     app.config.from_pyfile("../config.py")
     extensions.db.init_app(app)
     extensions.redis_client.init_app(app)
@@ -53,11 +54,6 @@ def create_app():
 
 
 webserver_bp = flask.Blueprint('trompaalign', __name__)
-
-
-@webserver_bp.route("/")
-def index():
-    return jsonify({"status": "ok"})
 
 
 @webserver_bp.route("/check_user_perms")
@@ -99,7 +95,6 @@ def add_score_status():
 @webserver_bp.route("/add", methods=["POST"])
 def add_score():
     score_url = request.json.get("score")
-    title = request.json.get("title")
     profile = request.json.get("profile")
 
     if not score_url:
@@ -107,7 +102,7 @@ def add_score():
     if not profile:
         return jsonify({"status": "error", "message": "Missing `profile` parameter"}), 400
 
-    task = tasks.add_score.delay(profile, score_url, title)
+    task = tasks.add_score.delay(profile, score_url)
     return jsonify({"status": "queued", "task_id": task.task_id})
 
 
@@ -120,3 +115,14 @@ def align():
 
     tasks.align.delay(score, performance, provider, webid)
     return jsonify({"status": "ok"})
+
+
+@webserver_bp.route('/', defaults={'path': 'index.html'})
+@webserver_bp.route('/<path:path>')
+def catch_all(path):
+    if "/" not in path:
+        user_path = ""
+        user_file = path
+    else:
+        user_path, user_file = path.rsplit("/", 1)
+    return send_from_directory(os.path.join('/clara', user_path), user_file)
