@@ -176,6 +176,8 @@ urllib3==1.26.14
     # via
     #   requests
     #   sentry-sdk
+uwsgi==2.0.21
+    # via -r requirements.in
 verovio==3.14.0
     # via -r requirements.in
 vine==5.0.0
