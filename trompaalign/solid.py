@@ -5,8 +5,8 @@ import uuid
 from urllib.error import HTTPError
 
 import rdflib
-from rdflib.namespace import RDF, RDFS, SKOS, DCTERMS, SDO
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib.namespace import RDF, SKOS, SDO
+from rdflib import URIRef, Namespace
 import requests
 import requests.utils
 from pyld import jsonld
@@ -34,34 +34,81 @@ jsonld_context = {
 }
 
 
-# TODO: is a / necessary at the end of a name?
-#  yes - according to LDP best practises
 CLARA_CONTAINER_NAME = "at.ac.mdw.trompa/"
+
+
+def http_options(provider, profile, container):
+    headers = get_bearer_for_user(provider, profile, container, 'OPTIONS')
+    r = requests.options(container, headers=headers)
+    r.raise_for_status()
+    return r.headers, r.content
 
 
 def get_pod_listing(provider, profile, storage):
     headers = get_bearer_for_user(provider, profile, storage, 'GET')
     resp = get_uri_jsonld(storage, headers)
-    compact = jsonld.compact(resp, jsonld_context)
-    return compact
+    if resp is not None:
+        compact = jsonld.compact(resp, jsonld_context)
+        return compact
+    else:
+        return None
 
 
-def get_clara_listing_for_pod(provider, profile, storage):
-    clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    headers = get_bearer_for_user(provider, profile, clara_container, 'GET')
-    try:
-        return get_uri_jsonld(clara_container, headers)
-    except requests.exceptions.HTTPError as e:
-        # Special case - container doesn't exist, therefore it's missing
-        if e.response.status_code == 404:
-            return None
-        else:
-            raise
+def get_pod_listing_ttl(provider, profile, storage):
+    headers = get_bearer_for_user(provider, profile, storage, 'GET')
+    return get_uri_ttl(storage, headers)
 
 
-def get_resource_from_pod(provider, profile, uri):
+def patch_container_item_title(provider, profile, container, item, title):
+    """
+    TODO: Trying to follow the sparkql-update syntax at https://www.w3.org/TR/2013/REC-sparql11-update-20130321/#insertData
+     to add another triple to a container.
+    however, when including the PREFIX syntax, node-solid-server fails with [including spelling error]
+        Patch document syntax error: Line 1 of <https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/scores/>: Bad syntax:
+        Unknown syntax at start of statememt: 'PREFIX dcterms: <htt'
+    The rdflib js parser doesn't support PREFIX: https://github.com/linkeddata/rdflib.js/blob/c5bcd95/src/patch-parser.js#L11
+
+    When inlining the relation, it fails with
+        Original file read error: Error: EISDIR: illegal operation on a directory, read
+
+    This appears to be because nss stores containers as directories on disk, and it can't store any additional
+    data related to the container other than the filesystem data (date created, etc)
+    """
+
+    headers = get_bearer_for_user(provider, profile, container, 'PATCH')
+    type_headers = {"Accept": "text/turtle", "content-type": "application/sparql-update"}
+    headers.update(type_headers)
+
+    update_data = f"""INSERT DATA
+{{ 
+  <{item}> <http://purl.org/dc/terms/title> "{title}" .
+}}"""
+
+    r = requests.patch(container, data=update_data, headers=headers)
+    print(r.text)
+    print(f"Status: {r.status_code}")
+
+
+def get_contents_of_container(container, container_name):
+    contents = []
+    for item in container["@graph"]:
+        # This returns 1 item for the actual url, which has ldp:contains: [list, of items]
+        # but then also enumerates the list of items
+        if item['@id'] == container_name:
+            contains = item.get('ldp:contains')
+            if not contains:
+                return []
+            if not isinstance(contains, list):
+                contains = [contains]
+            for cont in contains:
+                contents.append(cont['@id'])
+    return contents
+
+
+def get_resource_from_pod(provider, profile, uri, accept=None):
     headers = get_bearer_for_user(provider, profile, uri, 'GET')
-    # headers.update({"Accept": "application/ld+json"})
+    if accept:
+        headers.update({"Accept": accept})
     r = requests.get(uri, headers=headers)
     r.raise_for_status()
     return r.content
@@ -144,9 +191,29 @@ def upload_mei_to_pod(provider, profile, storage, payload):
 def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
     # TODO: This duplicates many other methods, could be simplified
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "webmidi", str(uuid.uuid4()) + ".json")
-    print(f"Uploading file {resource}")
+    print(f"Uploading webmidi file to {resource}")
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
     headers["content-type"] = "application/json"
+    r = requests.put(resource, data=payload, headers=headers)
+    print("status:", r.text)
+    return resource
+
+
+def upload_midi_to_pod(provider, profile, storage, payload: bytes):
+    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "midi", str(uuid.uuid4()) + ".mid")
+    print(f"Uploading midi file to {resource}")
+    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers["content-type"] = "audio/midi"
+    r = requests.put(resource, data=payload, headers=headers)
+    print("status:", r.text)
+    return resource
+
+
+def upload_mp3_to_pod(provider, profile, storage, payload: bytes):
+    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "audio", str(uuid.uuid4()) + ".mp3")
+    print(f"Uploading mp3 file to {resource}")
+    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers["content-type"] = "audio/mpeg"
     r = requests.put(resource, data=payload, headers=headers)
     print("status:", r.text)
     return resource
@@ -196,28 +263,21 @@ def save_segments_file(provider, profile, storage, segments_contents):
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
 
     r = requests.put(resource, data=segments_contents, headers=headers)
-    print(r.text)
     return resource
 
-"""
-    g = Graph()
-    g.bind("mo", MO)
-    g.bind("meld", MELD)
-    g.bind("skos", SKOS)
-    g.bind("rdfs", RDFS)
-    g.bind("tl", TL)
 
-    score = URIRef()
-    mei_uri = URIRef(mei_external_uri)
-    mei_copy_uri = URIRef(mei_copy_uri)
+def find_score_for_external_uri(provider, profile, storage, mei_external_uri):
+    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
+    score_listing = get_pod_listing(provider, profile, resource)
+    contents = get_contents_of_container(score_listing, resource)
+    for item in contents:
+        file = get_resource_from_pod(provider, profile, item)
+        graph = rdflib.Graph()
+        graph.parse(file)
+        matches = list(graph.triples((None, MO.published_as, URIRef(mei_external_uri))))
+        if len(matches):
+            return item
 
-    g.add((score, RDF.type, MO.Score))
-    g.add((score, MO.published_as, mei_uri))
-    g.add((score, MELD.segments, URIRef(segments_uri)))
-    g.add((score, DCTERMS.title, title))
-    g.add((mei_copy_uri, RDF.type, MO.PublishedScore))
-    g.add((mei_copy_uri, SKOS.exactMatch, mei_uri))
-"""
 
 def create_and_save_structure(provider, profile, storage, title, mei_payload: str, mei_external_uri, mei_copy_uri):
     """A 'score' is an RDF document that describes an MEI file and the segments that we generate
@@ -233,28 +293,39 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     """
 
     score_id = str(uuid.uuid4())
-    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", score_id)
+    score_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", score_id)
+    segment_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "segments", score_id)
+    score_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", score_id)
 
     mei_io = io.BytesIO(mei_payload.encode("utf-8"))
     mei_io.seek(0)
 
     segmentation = generate_structural_segmentation(mei_io)
-    graph = segmentation_to_graph(segmentation, resource, mei_external_uri, title)
+    segmentation_graph = segmentation_to_graph(segmentation, score_resource, mei_external_uri, title)
 
     # TODO: This wasn't in the original convert_to_rdf, but we decided to add it. ideally this should
     #   be part of that function, and that function should use rdflib, not manually construct the ttl
     mei_copy_uri_ref = URIRef(mei_copy_uri)
-    graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
-    graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_external_uri)))
+    segmentation_graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
+    segmentation_graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_external_uri)))
 
-    n3String = graph.serialize(format='n3')
+    n3String = segmentation_graph.serialize(format='n3')
 
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, score_resource, 'PUT')
     headers["content-type"] = "text/turtle"
 
-    r = requests.put(resource, data=n3String, headers=headers)
-    print("Making structure:", resource)
+    r = requests.put(score_resource, data=n3String, headers=headers)
+    print("Making structure:", score_resource)
     print(r.text)
+
+
+def get_uri_jsonld_or_none(uri, headers=None):
+    try:
+        return get_uri_jsonld(uri, headers)
+    except requests.exceptions.HTTPError as e:
+        print("Error", e)
+        print(" message:", e.response.text)
+        return None
 
 
 def get_uri_jsonld(uri, headers=None):
@@ -266,15 +337,25 @@ def get_uri_jsonld(uri, headers=None):
     return r.json()
 
 
+def get_uri_ttl(uri, headers=None):
+    if not headers:
+        headers = {}
+    headers.update({"Accept": "text/turtle"})
+    r = requests.get(uri, headers=headers)
+    r.raise_for_status()
+    return r.text
+
+
 def get_storage_from_profile(profile_uri):
-    profile = get_uri_jsonld(profile_uri)
-    expanded = jsonld.expand(profile, jsonld_context)
-    id_card = [l for l in expanded if l.get('@id') == profile_uri]
-    if id_card:
-        id_card = id_card[0]
-        storage = id_card.get('http://www.w3.org/ns/pim/space#storage', [])
-        if isinstance(storage, list) and storage:
-            return storage[0].get('@id')
-        elif storage:
-            return storage.get('@id')
+    profile = get_uri_jsonld_or_none(profile_uri)
+    if profile is not None:
+        expanded = jsonld.expand(profile, jsonld_context)
+        id_card = [l for l in expanded if l.get('@id') == profile_uri]
+        if id_card:
+            id_card = id_card[0]
+            storage = id_card.get('http://www.w3.org/ns/pim/space#storage', [])
+            if isinstance(storage, list) and storage:
+                return storage[0].get('@id')
+            elif storage:
+                return storage.get('@id')
     return None

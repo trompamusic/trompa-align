@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import urllib.error
 import uuid
 
 import rdflib
@@ -8,11 +9,13 @@ import requests
 from celery import shared_task
 from rdflib import URIRef
 
+from scripts.convert_to_rdf import graph_to_turtle, graph_to_jsonld
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.performance_alignment_workflow import perform_workflow
-from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, get_clara_listing_for_pod, \
+from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, \
     create_clara_container, upload_mei_to_pod, \
-    get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, MO, RDF
+    get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, MO, RDF, \
+    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod
 
 
 @shared_task(ignore_result=False)
@@ -45,9 +48,11 @@ def add_score(profile, mei_external_uri):
         print("Cannot find storage, quitting")
         return
 
-    clara_container = get_clara_listing_for_pod(provider, profile, storage)
-    if clara_container is None:
-        create_clara_container(provider, profile, storage)
+    try:
+        clara_container = get_pod_listing(provider, profile, storage)
+    except urllib.error.HTTPError as e:
+        if e.status == 404:
+            create_clara_container(provider, profile, storage)
 
     r = requests.get(mei_external_uri)
     r.raise_for_status()
@@ -59,14 +64,14 @@ def add_score(profile, mei_external_uri):
     create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)
 
 
-
 @shared_task()
-def align_recording(profile, score_url, webmidi_url, performance_container):
+def align_recording(profile, score_url, webmidi_url, midi_url, performance_container):
     """
 
     :param profile:
     :param score_url: the URL of our "score" RDF document
-    :param webmidi_url:
+    :param webmidi_url: The URL of the uploaded webmidi file, or None if there is only a midi file
+    :param midi_url: should be set only if webmidi is None
     :param performance_container:
     :return:
     """
@@ -102,17 +107,22 @@ def align_recording(profile, score_url, webmidi_url, performance_container):
         else:
             print(f"Cannot find external location of MEI file given the score resource {score_url}")
             return
-        webmidi = get_resource_from_pod(provider, profile, webmidi_url)
+
         mei_content = get_resource_from_pod(provider, profile, external_mei_url)
 
         mei_file = os.path.join(td, "score.mei")
         with open(mei_file, "wb") as fp:
             fp.write(mei_content)
 
-        midi = midi_json_to_midi(json.loads(webmidi.decode("utf-8")))
-        midi_file = os.path.join(td, "performance.mid")
-        midi.save(midi_file)
-        # upload midi
+        if webmidi_url is not None:
+            print("Converting webmidi to midi and uploading")
+            webmidi = get_resource_from_pod(provider, profile, webmidi_url)
+            midi = midi_json_to_midi(json.loads(webmidi.decode("utf-8")))
+            midi_file = os.path.join(td, "performance.mid")
+            midi.save(midi_file)
+            midi_url = upload_midi_to_pod(provider, profile, storage, open(midi_file, "rb").read())
+        else:
+            print("only got a midi URL, using it directly")
 
         # TODO: This is done by perform_workflow, I think
         # mp3_file = os.path.join(td, "performance.mp3")
@@ -123,13 +133,24 @@ def align_recording(profile, score_url, webmidi_url, performance_container):
         audio_container = os.path.join(clara_container, "audio")
         perf_fname = str(uuid.uuid4())
         audio_fname = str(uuid.uuid4()) + '.mp3'
-        perform_workflow(midi_file, mei_file, expansion, external_mei_url, score_url, performance_container,
-                         audio_container, td, perf_fname, audio_fname)
+        performance_graph = perform_workflow(
+            midi_file, mei_file, expansion, external_mei_url, score_url, performance_container,
+            audio_container, td, perf_fname, audio_fname)
 
-        performance = json.load(open(os.path.join(td, perf_fname)))
-        # print(performance)
         performance_resource = os.path.join(performance_container, perf_fname)
         print(f"Performance resource: {performance_resource}")
+
+        audio_resource = os.path.join(audio_container, audio_fname)
+        mp3_uri = upload_mp3_to_pod(provider, profile, audio_resource, open(os.path.join(td, audio_fname), "rb").read())
+
+        # Add triples for Signal->Midi and Midi->webmidi
+        performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))
+        performance_graph.add((URIRef(f"{performance_resource}#Signal"), MO.derived_from, URIRef(midi_url)))
+        if webmidi_url:
+            performance_graph.add((URIRef(midi_url), MO.derived_from, URIRef(webmidi_url)))
+        print(graph_to_turtle(performance_graph))
+
+        graph_json = graph_to_jsonld(performance_graph)
 
         files = os.listdir(td)
         print(f"Files in temp dir {td}")
@@ -138,5 +159,3 @@ def align_recording(profile, score_url, webmidi_url, performance_container):
 
         # save timeline
         # save performance manifest
-        # save audio
-        # save midi

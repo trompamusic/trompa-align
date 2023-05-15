@@ -8,8 +8,10 @@ import requests.utils
 from trompasolid.client import get_bearer_for_user
 
 from trompaalign.solid import get_storage_from_profile, lookup_provider_from_profile, get_pod_listing, \
-    CLARA_CONTAINER_NAME, create_clara_container, get_clara_listing_for_pod, upload_mei_to_pod, \
-    create_and_save_structure, get_title_from_mei, upload_webmidi_to_pod, create_performance_container
+    CLARA_CONTAINER_NAME, create_clara_container, upload_mei_to_pod, \
+    create_and_save_structure, get_title_from_mei, upload_webmidi_to_pod, create_performance_container, \
+    get_contents_of_container, find_score_for_external_uri, upload_midi_to_pod, http_options, get_pod_listing_ttl, \
+    patch_container_item_title
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -40,10 +42,11 @@ def cmd_list_containers_in_pod(profile):
 
 
 @cli.command("list-container")
+@click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("container")
-def cmd_list_container(profile, container):
-    """Get the contents of a ontainer"""
+def cmd_list_container(use_json, profile, container):
+    """Get the contents of a container"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -56,8 +59,17 @@ def cmd_list_container(profile, container):
 
     print(f"Storage: {storage}")
 
-    response = get_pod_listing(provider, profile, container)
-    print(json.dumps(response, indent=2))
+    if use_json:
+        response = get_pod_listing(provider, profile, container)
+        print(json.dumps(response, indent=2))
+    else:
+        response = get_pod_listing_ttl(provider, profile, container)
+        print(response)
+    return
+    if response is not None:
+        contents = get_contents_of_container(response, container)
+        for item in contents:
+            print("  -", item)
 
 
 @cli.command("list-clara")
@@ -80,20 +92,17 @@ def cmd_check_pod_for_clara(profile):
 
     print(f"Storage: {storage}")
 
-    listing = get_clara_listing_for_pod(provider, profile, storage)
+    clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
+    listing = get_pod_listing(provider, profile, clara_container)
     print(json.dumps(listing, indent=2))
     if listing is None:
         print("User storage doesn't include clara container. Use `create-clara` command")
         return
     else:
-        for item in listing:
-            # This returns 1 item for the actual url, which has ldp:contains: [list, of items]
-            # but then also enumerates the list of items
-            if item['@id'] == os.path.join(storage, CLARA_CONTAINER_NAME):
-                print(item['@id'])
-                print("  contains:")
-                for cont in item.get('http://www.w3.org/ns/ldp#contains', []):
-                    print("  -", cont['@id'])
+        contents = get_contents_of_container(listing, clara_container)
+        print(clara_container)
+        for item in contents:
+            print("  -", item)
 
 
 @cli.command("create-clara")
@@ -115,10 +124,51 @@ def cmd_add_clara_to_pod(profile):
 
 
 @cli.command("get-resource")
+@click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("resource")
-def cmd_get_resource(profile, resource):
+def cmd_get_resource(use_json, profile, resource):
     """Get a resource, authenticating as a specific user"""
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+
+    headers = get_bearer_for_user(provider, profile, resource, 'GET')
+    if use_json:
+        type_headers = {"Accept": "application/ld+json"}
+    else:
+        type_headers = {"Accept": "text/turtle"}
+    headers.update(type_headers)
+    r = requests.get(resource, headers=headers)
+    r.raise_for_status()
+    if use_json:
+        print(json.dumps(r.json(), indent=2))
+    else:
+        print(r.text)
+
+
+@cli.command("patch-title")
+@click.argument("profile")
+@click.argument("container")
+@click.argument("item")
+@click.argument("title")
+def cmd_patch_container_title(profile, container, item, title):
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+
+    patch_container_item_title(provider, profile, container, item, title)
+
+
+@cli.command("get-score-for-url")
+@click.argument("profile")
+@click.argument("score_url")
+def cmd_get_score_for_url(profile, score_url):
+    """Find the score container for a given score external URL"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -129,14 +179,9 @@ def cmd_get_resource(profile, resource):
         print("Cannot find storage, quitting")
         return
 
-    print(f"Storage: {storage}")
-
-    headers = get_bearer_for_user(provider, profile, resource, 'GET')
-    type_headers = {"Accept": "application/ld+json"}
-    headers.update(type_headers)
-    r = requests.get(resource, headers=headers)
-    r.raise_for_status()
-    print(json.dumps(r.json(), indent=2))
+    score = find_score_for_external_uri(provider, profile, storage, score_url)
+    if score:
+        print(f"External MEI URL is in this user's solid pod as {score}")
 
 
 def recursive_delete_from_pod(provider, profile, container):
@@ -232,11 +277,11 @@ def cmd_upload_score_to_pod(profile, url, file, title):
     create_and_save_structure(provider, profile, storage, title, payload, url, mei_copy_uri)
 
 
-@cli.command("upload-performance")
+@cli.command("upload-webmidi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
-def cmd_upload_performance_to_pod(profile, file):
-    """Upload a webmidi performance to a pod"""
+def cmd_upload_webmidi_to_pod(profile, file):
+    """Upload a webmidi performance to a pod, convert to midi, and upload the midi"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -249,6 +294,26 @@ def cmd_upload_performance_to_pod(profile, file):
     payload = open(file, "rb").read()
 
     resource = upload_webmidi_to_pod(provider, profile, storage, payload)
+    print(f"Uploaded: {resource}")
+
+
+@cli.command("upload-midi")
+@click.argument("profile")
+@click.argument("file", type=click.Path(exists=True))
+def cmd_upload_midi_to_pod(profile, file):
+    """Upload a midi performance to a pod"""
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+    storage = get_storage_from_profile(profile)
+    if not storage:
+        print("Cannot find storage, quitting")
+        return
+
+    payload = open(file, "rb").read()
+
+    resource = upload_midi_to_pod(provider, profile, storage, payload)
     print(f"Uploaded: {resource}")
 
 
@@ -330,15 +395,22 @@ def cmd_options(profile, resource):
     print(r.text)
 
 @cli.command("align-recording")
+@click.option("--midi/--webmidi")
 @click.argument("profile")
 @click.argument("score_url")
-@click.argument("webmidi_url")
+@click.argument("midi_url")
 @click.argument("performance_container")
-def cmd_align_recording(profile, score_url, webmidi_url, performance_container):
+def cmd_align_recording(is_midi, profile, score_url, midi_url, performance_container):
     """Run the alignment process """
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
         return
 
-    align_recording(profile, score_url, webmidi_url, performance_container)
+    if is_midi:
+        midi_url = midi_url
+        webmidi_url = None
+    else:
+        midi_url = None
+        webmidi_url = midi_url
+    align_recording(profile, score_url, webmidi_url, midi_url, performance_container)
