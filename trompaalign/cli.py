@@ -196,7 +196,7 @@ def recursive_delete_from_pod(provider, profile, container):
     After recursing into it, delete the container itself, as it'll be empty.
     """
     listing = get_pod_listing(provider, profile, container)
-    for item in listing['@graph']:
+    for item in listing.get('@graph', []):
         item_id = item['@id']
         # First item is ourselves, skip it
         if item_id == container:
@@ -227,7 +227,8 @@ def cmd_delete_clara_container_from_pod(profile):
         print("Cannot find storage, quitting")
         return
 
-    listing = get_clara_listing_for_pod(provider, profile, storage)
+    clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
+    listing = get_pod_listing(provider, profile, clara_container)
     if listing is None:
         print("Pod has no clara storage, quitting")
         return
