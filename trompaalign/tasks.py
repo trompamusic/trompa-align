@@ -7,15 +7,16 @@ import uuid
 import rdflib
 import requests
 from celery import shared_task
-from rdflib import URIRef
+from rdflib import URIRef, RDF
 
 from scripts.convert_to_rdf import graph_to_turtle, graph_to_jsonld
 from scripts.midi_events_to_file import midi_json_to_midi
+from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, \
     create_clara_container, upload_mei_to_pod, \
-    get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, MO, RDF, \
-    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod
+    get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, \
+    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest
 
 
 @shared_task(ignore_result=False)
@@ -123,11 +124,10 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
             midi_url = upload_midi_to_pod(provider, profile, storage, open(midi_file, "rb").read())
         else:
             print("only got a midi URL, using it directly")
-
-        # TODO: This is done by perform_workflow, I think
-        # mp3_file = os.path.join(td, "performance.mp3")
-        # midi_to_mp3(midi_file, mp3_file, td)
-        # upload audio
+            midi_contents = get_resource_from_pod(provider, profile, midi_url)
+            midi_file = os.path.join(td, "performance.mid")
+            with open(midi_file, "wb") as fp:
+                fp.write(midi_contents)
 
         expansion = None
         audio_container = os.path.join(clara_container, "audio")
@@ -145,17 +145,13 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
 
         # Add triples for Signal->Midi and Midi->webmidi
         performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))
-        performance_graph.add((URIRef(f"{performance_resource}#Signal"), MO.derived_from, URIRef(midi_url)))
+        performance_signal_ref = URIRef(f"{performance_resource}#Signal")
+        performance_graph.add((performance_signal_ref, RDF.type, MO.Signal))
+        performance_graph.add((performance_signal_ref, MO.available_as, URIRef(mp3_uri)))
+        performance_graph.add((performance_signal_ref, MO.derived_from, URIRef(midi_url)))
         if webmidi_url:
             performance_graph.add((URIRef(midi_url), MO.derived_from, URIRef(webmidi_url)))
-        print(graph_to_turtle(performance_graph))
 
         graph_json = graph_to_jsonld(performance_graph)
 
-        files = os.listdir(td)
-        print(f"Files in temp dir {td}")
-        for f in files:
-            print(f" - {f}")
-
-        # save timeline
-        # save performance manifest
+        save_performance_manifest(provider, profile, performance_resource, graph_json)

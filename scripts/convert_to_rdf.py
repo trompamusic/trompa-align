@@ -9,7 +9,9 @@ from statistics import mean
 from uuid import uuid4
 
 from lxml import etree as ET
-from rdflib import Graph
+from rdflib import Graph, URIRef, RDF, SKOS
+
+from scripts.namespace import MO
 
 
 def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance):
@@ -200,25 +202,39 @@ def generate_structural_segmentation(meiFile):
     return first_note_per_section
 
 
-def segmentation_to_graph(seg_data, segUri, meiUri, title):
+def score_to_graph(score_uri, seg_uri, performance_resource, mei_uri, mei_copy_uri, title):
+    rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
+    @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    @prefix dcterms: <http://purl.org/dc/terms/> .
+    @prefix meld: <https://meld.linkedmusic.org/terms/> .
+
+    <{mei_uri}> a mo:PublishedScore .
+
+    <{score_uri}> a mo:Score ;
+        mo:published_as <{mei_uri}> ;
+        dcterms:title "{title}" ;
+        meld:segments <{seg_uri}> .
+    """
+    graph = Graph().parse(data=rdf, format="n3")
+    mei_copy_uri_ref = URIRef(mei_copy_uri)
+    mei_uri_ref = URIRef(mei_uri)
+    graph.add((mei_uri_ref, SKOS.related, URIRef(performance_resource)))
+    graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
+    graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_uri)))
+    return graph
+
+def segmentation_to_graph(seg_data, segUri):
     rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
 @prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix meld: <https://meld.linkedmusic.org/terms/> .
 @base <{segUri}> .
 
-<{meiUri}> a mo:PublishedScore .
-
-<> a mo:Score ;
-    mo:published_as <{meiUri}> ;
-    dcterms:title "{title}" ;
-    meld:segments <{segUri}#segmentation> .
-
-<{segUri}#segmentation> a so:SegmentLine .
-    """.format(segUri=segUri, meiUri=meiUri, title=title)
+<{segUri}> a so:SegmentLine .
+    """.format(segUri=segUri)
     for ix, seg in enumerate(seg_data):
         rdf += """<#{segId}> a so:Segment ; 
     so:onSegmentLine <{segUri}#segmentation> ;
@@ -234,15 +250,15 @@ def segmentation_to_graph(seg_data, segUri, meiUri, title):
             ix=ix,
             segUri=segUri,
             segId=seg,
-            sectionId=meiUri + "#" + seg,
-            first="<" + meiUri + "#" + seg_data[seg]["first"] + ">",
-            last="<" + meiUri + "#" + seg_data[seg]["last"] + ">",
+            sectionId=segUri + "#" + seg,
+            first="<" + segUri + "#" + seg_data[seg]["first"] + ">",
+            last="<" + segUri + "#" + seg_data[seg]["last"] + ">",
             # take this segment's map object for notes / measures built up in generate_structural_segmentation
             # convert it to a list
             # iterate through it decorating URI's with comma-separated <>
             # remove the last comma (for valid turtle)
-            notes="".join(["<" + meiUri + "#" + n + ">, " for n in seg_data[seg]["notes"]]).rpartition(", ")[0],
-            measures="".join(["<" + meiUri + "#" + n + ">, " for n in seg_data[seg]["measures"]]).rpartition(", ")[0],
+            notes="".join(["<" + segUri + "#" + n + ">, " for n in seg_data[seg]["notes"]]).rpartition(", ")[0],
+            measures="".join(["<" + segUri + "#" + n + ">, " for n in seg_data[seg]["measures"]]).rpartition(", ")[0],
             endterm=".",
             before="",
             after="")

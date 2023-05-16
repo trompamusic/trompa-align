@@ -9,9 +9,9 @@ from trompasolid.client import get_bearer_for_user
 
 from trompaalign.solid import get_storage_from_profile, lookup_provider_from_profile, get_pod_listing, \
     CLARA_CONTAINER_NAME, create_clara_container, upload_mei_to_pod, \
-    create_and_save_structure, get_title_from_mei, upload_webmidi_to_pod, create_performance_container, \
-    get_contents_of_container, find_score_for_external_uri, upload_midi_to_pod, http_options, get_pod_listing_ttl, \
-    patch_container_item_title
+    create_and_save_structure, get_title_from_mei, upload_webmidi_to_pod, \
+    get_contents_of_container, find_score_for_external_uri, upload_midi_to_pod, get_pod_listing_ttl, \
+    patch_container_item_title, http_options
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -318,24 +318,6 @@ def cmd_upload_midi_to_pod(profile, file):
     print(f"Uploaded: {resource}")
 
 
-@cli.command("create-performance-container")
-@click.argument("profile")
-@click.argument("mei_external_uri")
-def cmd_create_performance_container(profile, mei_external_uri):
-    """Create a container for a specific uri"""
-    provider = lookup_provider_from_profile(profile)
-    if not provider:
-        print("Cannot find provider, quitting")
-        return
-    storage = get_storage_from_profile(profile)
-    if not storage:
-        print("Cannot find storage, quitting")
-        return
-
-    container = create_performance_container(provider, profile, storage, mei_external_uri)
-    print(f"Created: {container}")
-
-
 @cli.command("add-turtle")
 @click.argument("profile")
 @click.argument("resource")
@@ -389,14 +371,14 @@ def cmd_options(profile, resource):
         return
 
     print(f"Running OPTIONS on {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'OPTIONS')
-    r = requests.options(resource, headers=headers)
-    for h, v in r.headers.items():
+    headers, content = http_options(provider, profile, resource)
+    for h, v in headers.items():
         print(f"{h}: {v}")
-    print(r.text)
+    print(content)
+
 
 @cli.command("align-recording")
-@click.option("--midi/--webmidi")
+@click.option("--midi/--webmidi", 'is_midi')
 @click.argument("profile")
 @click.argument("score_url")
 @click.argument("midi_url")

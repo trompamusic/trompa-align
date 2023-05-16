@@ -2,9 +2,8 @@ import json
 import os
 import requests
 import subprocess
-import sys
 
-from .convert_to_rdf import maps_result_to_graph, graph_to_jsonld
+from .convert_to_rdf import maps_result_to_graph
 from .mei_to_midi import mei_to_midi
 from .midi_to_mp3 import midi_to_mp3
 from . import verovio_midi
@@ -76,7 +75,5 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
         os.path.join(audio_container, audio_fname),
         True
     )
-    jsonld = json.dumps(graph_to_jsonld(g), indent=2)
-    with open(os.path.join(tempdir, perf_fname), 'w') as json_file:
-        json_file.write(jsonld)
-    print("** Success: Created timeline output: ", os.path.join(tempdir, perf_fname))
+    print("** Success: Created timeline output: ", perf_fname)
+    return g

@@ -5,24 +5,20 @@ import uuid
 from urllib.error import HTTPError
 
 import rdflib
-from rdflib.namespace import RDF, SKOS, SDO
-from rdflib import URIRef, Namespace
+from rdflib import URIRef
 import requests
 import requests.utils
 from pyld import jsonld
 from trompasolid.client import get_bearer_for_user
 
-from scripts.convert_to_rdf import generate_structural_segmentation, segmentation_to_graph
+from scripts.convert_to_rdf import generate_structural_segmentation, segmentation_to_graph, score_to_graph
+from scripts.namespace import MO
 from trompaalign.mei import get_metadata_for_mei
 
 
 class SolidError(Exception):
     pass
 
-MO = Namespace("http://purl.org/ontology/mo/")
-MELD = Namespace("https://meld.linkedmusic.org/terms/")
-TL = Namespace("http://purl.org/NET/c4dm/timeline.owl#")
-LDP = Namespace("http://www.w3.org/ns/ldp#")
 
 jsonld_context = {
     'mo': 'http://purl.org/ontology/mo/',
@@ -219,53 +215,6 @@ def upload_mp3_to_pod(provider, profile, storage, payload: bytes):
     return resource
 
 
-def create_performance_container(provider, profile, storage, mei_external_uri):
-
-    container_uuid = str(uuid.uuid4())
-    # End with a /
-    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "performances", container_uuid, "")
-    print(f"Creating {resource}")
-
-    g = rdflib.Graph()
-    g.bind("ldp", LDP)
-    g.bind("schema", SDO)
-
-    container_ref = URIRef('')
-    g.add((container_ref, RDF.type, LDP.BasicContainer))
-    g.add((container_ref, RDF.type, LDP.Container))
-    g.add((container_ref, RDF.type, LDP.Resource))
-    g.add((container_ref, SDO.about, URIRef(mei_external_uri)))
-    print(g.serialize(format="n3"))
-
-    # TODO: Identify differences between PUT and POST for creating containers
-    #  https://www.w3.org/TR/ldp-primer/#creating-containers-and-structural-hierarchy
-    #  seems to imply that you can POST to a parent container to make a new child one. Do they all need
-    #  to exist up the tree? In any case, this PUT seems to work fine
-    # Spec says:
-    # Clients can create LDPRs via POST (section 5.2.3 HTTP POST) to a LDPC,
-    # via PUT (section 4.2.4 HTTP PUT), or any other methods allowed for HTTP resources
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
-    headers["content-type"] = "text/turtle"
-    headers["slug"] = container_uuid
-    headers["link"] = '<http://www.w3.org/ns/ldp/BasicContainer>; rel="type"'
-
-    r = requests.put(resource, data=g.serialize(format='n3'), headers=headers)
-    print(r.text)
-
-    # TODO: HTTP PATCH to add
-    # "http://schema.org/about": {'@id': url},
-
-
-
-def save_segments_file(provider, profile, storage, segments_contents):
-    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "segments", str(uuid.uuid4()))
-
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
-
-    r = requests.put(resource, data=segments_contents, headers=headers)
-    return resource
-
-
 def find_score_for_external_uri(provider, profile, storage, mei_external_uri):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
     score_listing = get_pod_listing(provider, profile, resource)
@@ -295,27 +244,34 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     score_id = str(uuid.uuid4())
     score_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", score_id)
     segment_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "segments", score_id)
-    score_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", score_id)
+    # Multiple performances for a score, so it ends in a / to make it a container
+    performance_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "performances", score_id, "")
 
     mei_io = io.BytesIO(mei_payload.encode("utf-8"))
     mei_io.seek(0)
 
     segmentation = generate_structural_segmentation(mei_io)
-    segmentation_graph = segmentation_to_graph(segmentation, score_resource, mei_external_uri, title)
+    segmentation_graph = segmentation_to_graph(segmentation, segment_resource)
+    score_graph = score_to_graph(score_resource, segment_resource, performance_resource, mei_external_uri, mei_copy_uri, title)
 
-    # TODO: This wasn't in the original convert_to_rdf, but we decided to add it. ideally this should
-    #   be part of that function, and that function should use rdflib, not manually construct the ttl
-    mei_copy_uri_ref = URIRef(mei_copy_uri)
-    segmentation_graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
-    segmentation_graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_external_uri)))
+    segmentation_data = segmentation_graph.serialize(format='n3')
+    score_data = score_graph.serialize(format='n3')
 
-    n3String = segmentation_graph.serialize(format='n3')
+    print("Making performance container:", performance_resource)
+    headers = get_bearer_for_user(provider, profile, performance_resource, 'PUT')
+    r = requests.put(performance_resource, headers=headers)
+    print(r.text)
 
+    print("Making score:", score_resource)
     headers = get_bearer_for_user(provider, profile, score_resource, 'PUT')
     headers["content-type"] = "text/turtle"
+    r = requests.put(score_resource, data=score_data, headers=headers)
+    print(r.text)
 
-    r = requests.put(score_resource, data=n3String, headers=headers)
-    print("Making structure:", score_resource)
+    print("Making segment:", segment_resource)
+    headers = get_bearer_for_user(provider, profile, segment_resource, 'PUT')
+    headers["content-type"] = "text/turtle"
+    r = requests.put(segment_resource, data=segmentation_data, headers=headers)
     print(r.text)
 
 
@@ -359,3 +315,11 @@ def get_storage_from_profile(profile_uri):
             elif storage:
                 return storage.get('@id')
     return None
+
+
+def save_performance_manifest(provider, profile, performance_uri, manifest):
+    print(f"Uploading manifest to {performance_uri}")
+    headers = get_bearer_for_user(provider, profile, performance_uri, 'PUT')
+    headers["content-type"] = "application/ld+json"
+    r = requests.put(performance_uri, data=json.dumps(manifest), headers=headers)
+    print("status:", r.text)
