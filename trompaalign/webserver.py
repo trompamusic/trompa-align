@@ -2,8 +2,8 @@ import os
 import flask
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import jsonify, Flask, request, send_from_directory, current_app
 import sentry_sdk
+from flask import request, jsonify
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
 from trompasolid.authentication import generate_authentication_url, NoProviderError, authentication_callback
@@ -15,7 +15,7 @@ from trompasolid import client
 from trompaalign.solid import SolidError, lookup_provider_from_profile
 
 
-def celery_init_app(app: Flask) -> Celery:
+def celery_init_app(app: flask.Flask) -> Celery:
     class FlaskTask(Task):
         def __call__(self, *args: object, **kwargs: object) -> object:
             with app.app_context():
@@ -60,39 +60,38 @@ def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
 
-    redirect_url = current_app.config['REDIRECT_URL']
-    always_use_client_url = current_app.config['ALWAYS_USE_CLIENT_URL']
+    redirect_url = flask.current_app.config['REDIRECT_URL']
+    always_use_client_url = flask.current_app.config['ALWAYS_USE_CLIENT_URL']
     try:
-        data = generate_authentication_url(extensions.backend, webid, redirect_url, always_use_client_url)
+        data = generate_authentication_url(extensions.backend.backend, webid, redirect_url, always_use_client_url)
 
         provider = data['provider']
         flask.session['provider'] = provider
         flask.session['redirect_after'] = redirect_after
+        log_messages = data.get('log_messages', [])
+        print("AUTH LOG")
+        for log_message in log_messages:
+            print(" ", log_message)
 
-        return flask.jsonify(data)
+        return jsonify(data)
 
     except NoProviderError as e:
-        return flask.jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 400
 
 
-@webserver_bp.route("/auth/callback")
+@webserver_bp.route("/auth/callback", methods=["POST"])
 def auth_callback():
-    auth_code = flask.request.args.get('code')
-    state = flask.request.args.get('state')
+    auth_code = flask.request.form.get('code')
+    state = flask.request.form.get('state')
 
     provider = flask.session['provider']
 
-    redirect_uri = current_app.config['REDIRECT_URL']
-    always_use_client_url = current_app.config['ALWAYS_USE_CLIENT_URL']
-    success = authentication_callback(extensions.backend, auth_code, state, provider, redirect_uri,
+    redirect_uri = flask.current_app.config['REDIRECT_URL']
+    always_use_client_url = flask.current_app.config['ALWAYS_USE_CLIENT_URL']
+    success = authentication_callback(extensions.backend.backend, auth_code, state, provider, redirect_uri,
                                       always_use_client_url)
 
-    if success:
-        redirect_after = flask.session.get("redirect_after")
-        return flask.render_template("success.html", redirect_after=redirect_after)
-    else:
-        print("Error when validating auth callback")
-        return "Error when validating auth callback", 500
+    return jsonify({"status": success})
 
 
 @webserver_bp.route("/check_user_perms")
@@ -165,4 +164,4 @@ def catch_all(path):
         user_file = path
     else:
         user_path, user_file = path.rsplit("/", 1)
-    return send_from_directory(os.path.join('/clara', user_path), user_file)
+    return flask.send_from_directory(os.path.join('/clara', user_path), user_file)

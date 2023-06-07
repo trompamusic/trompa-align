@@ -11,6 +11,7 @@ jwcrypto==1.4.2
 lxml==4.9.2
 midi2audio==0.1.1
 mido==1.2.10
+oic==1.5.0
 pydub==0.25.1
 pyld==2.0.3
 psycopg2-binary==2.9.5
@@ -20,6 +21,6 @@ redis==4.5.5
 requests==2.28.2
 sentry-sdk[flask]==1.16.0
 SQLAlchemy==2.0.3
-git+https://github.com/trompamusic/solid-oidc-app-permission.git@a380c9b#egg=trompa_solid
+git+https://github.com/trompamusic/solid-oidc-app-permission.git@463fe3c#egg=trompa_solid
 uWSGI==2.0.21
 verovio==3.14.0
