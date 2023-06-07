@@ -218,8 +218,7 @@ def score_to_graph(score_uri, seg_uri, performance_resource, mei_uri, mei_copy_u
     """
     graph = Graph().parse(data=rdf, format="n3")
     mei_copy_uri_ref = URIRef(mei_copy_uri)
-    mei_uri_ref = URIRef(mei_uri)
-    graph.add((mei_uri_ref, SKOS.related, URIRef(performance_resource)))
+    graph.add((URIRef(score_uri), SKOS.related, URIRef(performance_resource)))
     graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
     graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_uri)))
     return graph
