@@ -274,6 +274,7 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     r = requests.put(segment_resource, data=segmentation_data, headers=headers)
     print(r.text)
 
+    return score_resource
 
 def get_uri_jsonld_or_none(uri, headers=None):
     try:

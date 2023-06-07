@@ -62,7 +62,7 @@ def add_score(profile, mei_external_uri):
     title = get_title_from_mei(payload)
     mei_copy_uri = upload_mei_to_pod(provider, profile, storage, payload)
 
-    create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)
+    return create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)
 
 
 @shared_task()
