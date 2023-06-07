@@ -179,7 +179,7 @@ traitlets==5.9.0
     # via
     #   ipython
     #   matplotlib-inline
-trompa-solid @ git+https://github.com/trompamusic/solid-oidc-app-permission.git@ffe3194
+trompa-solid @ git+https://github.com/trompamusic/solid-oidc-app-permission.git@a380c9b
     # via -r requirements.in
 typing-extensions==4.4.0
     # via sqlalchemy

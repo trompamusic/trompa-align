@@ -9,6 +9,8 @@ services:
     build: .
     ports:
       - "8000:5000"
+    environment:
+      PYTHONUNBUFFERED: 1
     command:
       - flask
       - --debug
