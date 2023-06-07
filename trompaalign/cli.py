@@ -207,15 +207,17 @@ def recursive_delete_from_pod(provider, profile, container):
         else:
             # Otherwise it's just a file, delete it.
             headers = get_bearer_for_user(provider, profile, item_id, 'DELETE')
-            r = requests.delete(item_id, headers=headers)
+            print(f"Delete file {item_id}")
+            requests.delete(item_id, headers=headers)
     # Finally, delete the container itself
     headers = get_bearer_for_user(provider, profile, container, 'DELETE')
-    r = requests.delete(container, headers=headers)
+    requests.delete(container, headers=headers)
 
 
 @cli.command("delete-clara")
 @click.argument("profile")
-def cmd_delete_clara_container_from_pod(profile):
+@click.option("-c", "--container")
+def cmd_delete_clara_container_from_pod(profile, container):
     """Delete the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -227,14 +229,16 @@ def cmd_delete_clara_container_from_pod(profile):
         print("Cannot find storage, quitting")
         return
 
-    clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
+    if container is None:
+        clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
+    else:
+        clara_container = os.path.join(storage, container)
     listing = get_pod_listing(provider, profile, clara_container)
     if listing is None:
         print("Pod has no clara storage, quitting")
         return
 
     # To delete, we need to recursively delete everything one by one
-    clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
     recursive_delete_from_pod(provider, profile, clara_container)
 
 
