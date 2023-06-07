@@ -18,7 +18,7 @@ psycopg2-binary==2.9.5
 python-dotenv==0.21.1
 rdflib==6.2.0
 redis==4.5.5
-requests==2.28.2
+requests==2.31.0
 sentry-sdk[flask]==1.16.0
 SQLAlchemy==2.0.3
 git+https://github.com/trompamusic/solid-oidc-app-permission.git@463fe3c#egg=trompa_solid
