@@ -136,8 +136,31 @@ def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
     return Graph().parse(data=rdf, format='n3')
 
 
-def graph_to_jsonld(g):
-    return json.loads(g.serialize(format='json-ld'))
+def graph_to_jsonld(g, mei_uri=None, tl_uri=None):
+    graph = json.loads(g.serialize(format='json-ld'))
+    context = {
+        "mo": "http://purl.org/ontology/mo/",
+        "dcterms": "http://purl.org/dc/terms/",
+        "ldp": "http://www.w3.org/ns/ldp#",
+        "stat": "http://www.w3.org/ns/posix/stat#",
+        "mime": "http://www.w3.org/ns/iana/media-types/",
+        "schema": "https://schema.org/about/",
+        "oa": "http://www.w3.org/ns/oa#",
+        "maps": "https://terms.trompamusic.eu/maps#",
+        "frbr": "http://purl.org/vocab/frbr/core#",
+        "tl": "http://purl.org/NET/c4dm/timeline.owl#",
+        "oam": "http://www.w3.org/ns/oa#motivatedBy",
+        "oab": "http://www.w3.org/ns/oa#bodyValue",
+        "oat": "http://www.w3.org/ns/oa#hasTarget",
+        "oaA": "http://www.w3.org/ns/oa#Annotation",
+    }
+    if mei_uri:
+        context["meiUri"] = mei_uri + "#"
+    if tl_uri:
+        context["tlUriFrag"] = tl_uri + "#"
+        context["tlUri"] = tl_uri
+    compacted = jsonld.compact(graph, context)
+    return compacted
 
 
 def graph_to_turtle(g):
