@@ -56,7 +56,7 @@ def create_app():
 webserver_bp = flask.Blueprint('trompaalign', __name__)
 
 
-@webserver_bp.route("/auth/request", methods=["POST"])
+@webserver_bp.route("/api/auth/request", methods=["POST"])
 def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
@@ -80,7 +80,7 @@ def auth_request():
         return jsonify({"error": str(e)}), 400
 
 
-@webserver_bp.route("/auth/callback", methods=["POST"])
+@webserver_bp.route("/api/auth/callback", methods=["POST"])
 def auth_callback():
     auth_code = flask.request.form.get('code')
     state = flask.request.form.get('state')
@@ -95,7 +95,7 @@ def auth_callback():
     return jsonify({"status": success})
 
 
-@webserver_bp.route("/check_user_perms")
+@webserver_bp.route("/api/check_user_perms")
 def check_user_perms():
     """Check if the given user has permissions in the backend to """
     profile_url = request.args.get("profile")
@@ -109,7 +109,7 @@ def check_user_perms():
     return jsonify({"has_permission": has_permission})
 
 
-@webserver_bp.route("/add/status")
+@webserver_bp.route("/api/add/status")
 def add_score_status():
     task_id = request.args.get("task")
     if not task_id:
@@ -132,7 +132,7 @@ def add_score_status():
             return jsonify({"status": "pending"})
 
 
-@webserver_bp.route("/add", methods=["POST"])
+@webserver_bp.route("/api/add", methods=["POST"])
 def add_score():
     score_url = request.json.get("score")
     profile = request.json.get("profile")
@@ -146,7 +146,7 @@ def add_score():
     return jsonify({"status": "queued", "task_id": task.task_id})
 
 
-@webserver_bp.route("/align", methods=["POST"])
+@webserver_bp.route("/api/align", methods=["POST"])
 def align():
     file = request.files.get('file')
     payload = file.read()
@@ -182,7 +182,7 @@ def align():
     return jsonify({"status": "queued", "task_id": task.task_id})
 
 
-@webserver_bp.route("/align/status")
+@webserver_bp.route("/api/align/status")
 def align_status():
     task_id = request.args.get("task")
     if not task_id:
