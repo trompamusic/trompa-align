@@ -3,23 +3,24 @@ import os
 import requests
 import subprocess
 
-from .convert_to_rdf import maps_result_to_graph
+from .convert_to_rdf import maps_result_to_graph, performance_to_graph
 from .mei_to_midi import mei_to_midi
 from .midi_to_mp3 import midi_to_mp3
 from . import verovio_midi
 from .smat_align import smat_align
 
 
-def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_uri, performance_container,
-                     audio_container, tempdir, perf_fname, audio_fname):
+def perform_workflow(performance_midi, mei_file, expansion, mei_uri, score_uri, performance_container,
+                     timeline_container, audio_container, tempdir, perf_fname, audio_fname):
     """Do an alignment of a performance vs the score
 
     :param performance_midi: path to midi file of the performance
     :param mei_file: path to mei file
     :param expansion: which expansion to perform (None for all, or a specific number)
     :param mei_uri: url of the external MEI file which is being performed
-    :param structure_uri: URL of the structure URL defining the mei and describing the score
+    :param score_uri: URL of the score URL describing the score
     :param performance_container: Location of a container in user's solid pod, where data for this performance will be
+    :param timeline_container: Location of a container in the user's pod where the timeline will be
     :param audio_container: Location of a container in the user's pod where the audio will be
     :param tempdir: temporary working directory to put files
     :param perf_fname: basename of the resource in performance_container
@@ -66,14 +67,19 @@ def perform_workflow(performance_midi, mei_file, expansion, mei_uri, structure_u
     with open(os.path.join(tempdir, "maps.json"), 'rb') as f:
         maps_json = f.read()
 
-    g = maps_result_to_graph(
+    audio_uri = os.path.join(audio_container, audio_fname)
+    performance_uri = os.path.join(performance_container, perf_fname)
+    timeline_uri = os.path.join(timeline_container, perf_fname)
+
+    timeline_graph = maps_result_to_graph(
         maps_json,
-        structure_uri,
         mei_uri,
-        os.path.join(performance_container, perf_fname),
-        structure_uri,
-        os.path.join(audio_container, audio_fname),
-        True
+        timeline_uri,
+        score_uri,
+        audio_uri,
+        includePerformance=False
     )
+
+    performance_graph = performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri)
     print("** Success: Created timeline output: ", perf_fname)
-    return g
+    return performance_graph, timeline_graph

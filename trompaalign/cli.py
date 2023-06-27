@@ -242,6 +242,21 @@ def cmd_delete_clara_container_from_pod(profile, container):
     recursive_delete_from_pod(provider, profile, clara_container)
 
 
+@cli.command("delete")
+@click.argument("profile")
+@click.argument("resource")
+def cmd_delete_resource(profile, resource):
+    """Delete an item from a pod"""
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+
+    headers = get_bearer_for_user(provider, profile, resource, 'DELETE')
+    requests.delete(resource, headers=headers)
+
+
 @cli.command("upload-score")
 @click.argument("profile")
 @click.option("--url", default=None)
@@ -386,8 +401,7 @@ def cmd_options(profile, resource):
 @click.argument("profile")
 @click.argument("score_url")
 @click.argument("midi_url")
-@click.argument("performance_container")
-def cmd_align_recording(is_midi, profile, score_url, midi_url, performance_container):
+def cmd_align_recording(is_midi, profile, score_url, midi_url):
     """Run the alignment process """
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -400,4 +414,4 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url, performance_conta
     else:
         midi_url = None
         webmidi_url = midi_url
-    align_recording(profile, score_url, webmidi_url, midi_url, performance_container)
+    align_recording(profile, score_url, webmidi_url, midi_url)

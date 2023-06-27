@@ -7,7 +7,7 @@ import uuid
 import rdflib
 import requests
 from celery import shared_task
-from rdflib import URIRef, RDF
+from rdflib import URIRef, RDF, SKOS
 
 from scripts.convert_to_rdf import graph_to_turtle, graph_to_jsonld
 from scripts.midi_events_to_file import midi_json_to_midi
@@ -16,7 +16,15 @@ from scripts.performance_alignment_workflow import perform_workflow
 from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, \
     create_clara_container, upload_mei_to_pod, \
     get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, \
-    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest
+    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest, save_performance_timeline
+
+
+class NoSuchScoreException(Exception):
+    pass
+
+
+class NoSuchPerformanceException(Exception):
+    pass
 
 
 @shared_task(ignore_result=False)
@@ -66,14 +74,13 @@ def add_score(profile, mei_external_uri):
 
 
 @shared_task()
-def align_recording(profile, score_url, webmidi_url, midi_url, performance_container):
+def align_recording(profile, score_url, webmidi_url, midi_url):
     """
 
     :param profile:
     :param score_url: the URL of our "score" RDF document
     :param webmidi_url: The URL of the uploaded webmidi file, or None if there is only a midi file
     :param midi_url: should be set only if webmidi is None
-    :param performance_container:
     :return:
     """
 
@@ -92,10 +99,6 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
         score = get_resource_from_pod(provider, profile, score_url)
         graph = rdflib.Graph()
         graph.parse(data=score, format='n3')
-        """
-        <uuid> a mo:Score ;
-      mo:published_as <external URL> ;
-      """
         # e.g., find all triples where `<someuri> a mo:score`
         # triples = list(graph.triples((None, RDF.type, MO.Score)))
         # However, we know what the someuri is, it's score_url
@@ -106,8 +109,18 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
             external_mei_url = triples[0][2]
             print(f"External MEI file is {external_mei_url}")
         else:
-            print(f"Cannot find external location of MEI file given the score resource {score_url}")
-            return
+            raise NoSuchScoreException(f"Cannot find external location of MEI file given the score resource {score_url}")
+
+        triples = list(graph.triples((uri_ref, SKOS.related, None)))
+        if triples:
+            performance_container = triples[0][2]
+            # TODO: Should the timeline container be related to the score too?
+            performance_uuid = str(performance_container).split("/")[-2]
+            timeline_container = os.path.join(clara_container, "timelines", performance_uuid)
+            print(f"Performance container is {performance_container}")
+            print(f"Timeline container is {timeline_container}")
+        else:
+            raise NoSuchPerformanceException(f"Cannot find location of performance container given the score resource {score_url}")
 
         mei_content = get_resource_from_pod(provider, profile, external_mei_url)
 
@@ -133,12 +146,14 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
         audio_container = os.path.join(clara_container, "audio")
         perf_fname = str(uuid.uuid4())
         audio_fname = str(uuid.uuid4()) + '.mp3'
-        performance_graph = perform_workflow(
+        performance_graph, timeline_graph = perform_workflow(
             midi_file, mei_file, expansion, external_mei_url, score_url, performance_container,
-            audio_container, td, perf_fname, audio_fname)
+            timeline_container, audio_container, td, perf_fname, audio_fname)
 
         performance_resource = os.path.join(performance_container, perf_fname)
         print(f"Performance resource: {performance_resource}")
+        timeline_resource = os.path.join(timeline_container, perf_fname)
+        print(f"Timeline resource: {timeline_resource}")
 
         audio_resource = os.path.join(audio_container, audio_fname)
         mp3_uri = upload_mp3_to_pod(provider, profile, audio_resource, open(os.path.join(td, audio_fname), "rb").read())
@@ -152,6 +167,8 @@ def align_recording(profile, score_url, webmidi_url, midi_url, performance_conta
         if webmidi_url:
             performance_graph.add((URIRef(midi_url), MO.derived_from, URIRef(webmidi_url)))
 
-        graph_json = graph_to_jsonld(performance_graph)
+        performance_document = graph_to_turtle(performance_graph)
+        timeline_document = graph_to_jsonld(timeline_graph, mei_uri=external_mei_url, tl_uri=timeline_resource)
 
-        save_performance_manifest(provider, profile, performance_resource, graph_json)
+        save_performance_manifest(provider, profile, performance_resource, performance_document)
+        save_performance_timeline(provider, profile, timeline_resource, timeline_document)

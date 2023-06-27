@@ -26,7 +26,8 @@ jsonld_context = {
     'ldp': 'http://www.w3.org/ns/ldp#',
     'stat': 'http://www.w3.org/ns/posix/stat#',
     'mime': 'http://www.w3.org/ns/iana/media-types/',
-    'schema': 'https://schema.org/about/'
+    'schema': 'https://schema.org/about/',
+    'oa': 'http://www.w3.org/ns/oa',
 }
 
 
@@ -205,8 +206,7 @@ def upload_midi_to_pod(provider, profile, storage, payload: bytes):
     return resource
 
 
-def upload_mp3_to_pod(provider, profile, storage, payload: bytes):
-    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "audio", str(uuid.uuid4()) + ".mp3")
+def upload_mp3_to_pod(provider, profile, resource, payload: bytes):
     print(f"Uploading mp3 file to {resource}")
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
     headers["content-type"] = "audio/mpeg"
@@ -246,6 +246,7 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     segment_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "segments", score_id)
     # Multiple performances for a score, so it ends in a / to make it a container
     performance_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "performances", score_id, "")
+    timeline_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "timelines", score_id, "")
 
     mei_io = io.BytesIO(mei_payload.encode("utf-8"))
     mei_io.seek(0)
@@ -262,6 +263,11 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     r = requests.put(performance_resource, headers=headers)
     print(r.text)
 
+    print("Making timeline container:", timeline_resource)
+    headers = get_bearer_for_user(provider, profile, timeline_resource, 'PUT')
+    r = requests.put(timeline_resource, headers=headers)
+    print(r.text)
+
     print("Making score:", score_resource)
     headers = get_bearer_for_user(provider, profile, score_resource, 'PUT')
     headers["content-type"] = "text/turtle"
@@ -275,6 +281,7 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     print(r.text)
 
     return score_resource
+
 
 def get_uri_jsonld_or_none(uri, headers=None):
     try:
@@ -321,6 +328,14 @@ def get_storage_from_profile(profile_uri):
 def save_performance_manifest(provider, profile, performance_uri, manifest):
     print(f"Uploading manifest to {performance_uri}")
     headers = get_bearer_for_user(provider, profile, performance_uri, 'PUT')
+    headers["content-type"] = "text/turtle"
+    r = requests.put(performance_uri, data=manifest, headers=headers)
+    print("status:", r.text)
+
+
+def save_performance_timeline(provider, profile, timeline_uri, timeline):
+    print(f"Uploading timeline to {timeline_uri}")
+    headers = get_bearer_for_user(provider, profile, timeline_uri, 'PUT')
     headers["content-type"] = "application/ld+json"
-    r = requests.put(performance_uri, data=json.dumps(manifest), headers=headers)
+    r = requests.put(timeline_uri, data=json.dumps(timeline), headers=headers)
     print("status:", r.text)

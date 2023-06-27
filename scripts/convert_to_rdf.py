@@ -3,20 +3,19 @@ import csv
 import json
 import os
 import sys
-import urllib.parse
 from datetime import datetime
 from statistics import mean
-from uuid import uuid4
 
 from lxml import etree as ET
 from rdflib import Graph, URIRef, RDF, SKOS
+from pyld import jsonld
 
 from scripts.namespace import MO
 
 
-def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance):
+def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, includePerformance):
     maps_result = json.loads(maps_result_json)
-    rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
+    rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
 @prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -26,36 +25,21 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audi
 @prefix maps: <https://terms.trompamusic.eu/maps#> .
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
 @prefix tlUri: <{tlUri}#> .
-@prefix segUri: <{segUri}#> .
 @prefix meiUri: <{meiUri}#> .
 @base <{tlUri}> .
-""".format(tlUri=tlUri, segUri=segUri, meiUri=meiUri)
+"""
 
-    if includePerformance:
-        label = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-        rdf += """<{tlUri}> a mo:Performance ;
-  mo:performance_of <{scoreUri}> ;
-  mo:recorded_as <{tlUri}#Signal> ;
-  rdfs:label "{label}" ;
-  meld:offset "-0.2" .
-<{tlUri}#Signal> mo:available_as <{audioUri}> ;
-    mo:time [ 
-        a tl:Interval; 
-        tl:onTimeLine <{tlUri}#timeline> 
-    ] .
+    rdf += f"""
+<{tlUri}> a tl:Timeline .
+    """
 
-""".format(tlUri=tlUri, scoreUri=scoreUri, label=label, audioUri=audioUri)
-
-    rdf += """
-<{tlUri}#timeline> a tl:Timeline .
-    """.format(segUri=segUri, meiUri=meiUri, tlUri=tlUri)
-
+    unique_num = 0
     for ix, obs in enumerate(maps_result):
         confidence = """maps:confidence "{0}" ;""".format(obs["confidence"]) if "confidence" in obs else ""
         # FIXME HACK -- currently averages note velocities occuring at the same time
         velocity = """maps:velocity "{0}" ;""".format(mean(obs["velocity"])) if "velocity" in obs else ""
         rdf += """tlUri:{ix} a tl:Instant ;
- tl:onTimeLine <{tlUri}#timeline> ;
+ tl:onTimeLine <{tlUri}> ;
  {confidence}{velocity}
  tl:at "P{mean_onset}S" ; """.format(ix=ix, mean_onset=obs["obs_mean_onset"], confidence=confidence, velocity=velocity,
                                      tlUri=tlUri)
@@ -72,24 +56,33 @@ def maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audi
             )
         # iterate through again to annotate velocities for each performed note
         for ix3, velocity in enumerate(obs["velocity"]):
-            rdf += """<#velocity{uuid}> a oa:Annotation ; 
+            rdf += """<#v{uuid}> a oa:Annotation ; 
     oa:motivatedBy oa:describing ;
-    oa:hasTarget <#target{uuid}> ;
+    oa:hasTarget <#t{uuid}> ;
     oa:bodyValue "{velocity}" .
-<#target{uuid}> oa:hasScope <{tlUri}#timeline> ;
+<#t{uuid}> oa:hasScope <{tlUri}> ;
     oa:hasSource {embodiment_id} .\n""".format(
-                uuid=str(uuid4()).replace("-", ""),
+                uuid=unique_num,
                 xml_id=obs["xml_id"][ix3],
                 embodiment_id=obs["xml_id"][ix3].replace("trompa-align_", "maps:") if obs["xml_id"][ix3].startswith(
                     "trompa-align_inserted_") else "meiUri:" + obs["xml_id"][ix3],
                 velocity=velocity,
                 tlUri=tlUri
             )
+            unique_num += 1
 
-    return Graph().parse(data=rdf, format='n3')
+    graph = Graph()
+    graph.parse(data=rdf, format='n3')
+    if includePerformance:
+        # TODO: better way of doing this? Docs say to merge you should parse from text twice:
+        #  https://rdflib.readthedocs.io/en/stable/merging.html, but it'd be great to merge nodes
+        performance_graph = performance_to_graph(tlUri, scoreUri, audioUri)
+        graph.parse(data=performance_graph.serialize(format='n3'), format='n3')
+    return graph
 
 
 def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri, performancesUri, worksUri):
+    assert False, "Need to update file format to include new parameters to performance_to_graph"
     graphs = []
     with open(performances_tsv, 'r') as tsvFile:
         tsv = csv.DictReader(tsvFile, delimiter="\t")
@@ -105,7 +98,7 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
                     continue
             graphs.append({
                 # generate performance RDF
-                "performance": performance_to_graph(row, tlUri, recordingUri, performancesUri, worksUri),
+                "performance": performance_to_graph(row, tlUri, recordingUri),
                 # generate timeline RDF
                 "timeline": maps_result_to_graph(maps_result_json, segUri, meiUri,
                                                  tlUri + "/" + row["PerformanceID"], False),
@@ -115,40 +108,31 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
     return graphs
 
 
-def performance_to_graph(perf_dict, tlUri, recordingUri, performancesUri, worksUri):
-    rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
+def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
+    now = datetime.now()
+    label = now.strftime("%d.%m.%Y %H:%M:%S")
+    created = now.isoformat()
+    rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
-@prefix frbr: <http://purl.org/vocab/frbr/core#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix meld: <https://meld.linkedmusic.org/terms/> .
-@prefix maps: <https://terms.trompamusic.eu/maps#> .
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
 @prefix mo: <http://purl.org/ontology/mo/> .
-
-<{perfPath}/{performanceID}> a mo:Performance ;
-    mo:performance_of <{worksUri}/{pieceLabel}> ;
-    mo:recorded_as <{perfPath}/{performanceID}#Signal> ;
-    meld:offset "{offset}" ;
-    rdfs:label "{firstName} {lastName} - {pieceLabel}" .
-
-<{perfPath}/{performanceID}#Signal> mo:available_as <{recordingUri}/{media}> ;
-    mo:time [ a tl:Interval ;
-    tl:onTimeLine <{perftl}/{performanceID}>
-] .
-""".format(
-        perftl=tlUri,
-        firstName=perf_dict["firstName"],
-        lastName=perf_dict["lastName"],
-        PID=urllib.parse.quote(perf_dict["PID"]),
-        pieceLabel=perf_dict["Work"],
-        performanceID=perf_dict["PerformanceID"],
-        recordingUri=recordingUri,
-        media=urllib.parse.quote(perf_dict["mediaName"]),
-        perfPath=performancesUri,
-        worksUri=worksUri,
-        offset=perf_dict["mediaOffset"]
-    )
+@prefix dcterms: <http://purl.org/dc/terms/> .
+    
+    <{performance_uri}> a mo:Performance ;
+      mo:performance_of <{score_uri}> ;
+      mo:recorded_as <{performance_uri}#Signal> ;
+      rdfs:label "{label}" ;
+      dcterms:created "{created}" ;
+      meld:offset "-0.2" .
+    <{performance_uri}#Signal> mo:available_as <{audio_uri}> ;
+        mo:time [ 
+            a tl:Interval; 
+            tl:onTimeLine <{timeline_uri}> 
+        ] .
+    """
     return Graph().parse(data=rdf, format='n3')
 
 
