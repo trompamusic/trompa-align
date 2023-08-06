@@ -73,7 +73,7 @@ def add_score(profile, mei_external_uri):
     return create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)
 
 
-@shared_task()
+@shared_task(ignore_result=False)
 def align_recording(profile, score_url, webmidi_url, midi_url):
     """
 
@@ -172,3 +172,5 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
 
         save_performance_manifest(provider, profile, performance_resource, performance_document)
         save_performance_timeline(provider, profile, timeline_resource, timeline_document)
+
+    return True
