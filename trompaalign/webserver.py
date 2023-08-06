@@ -89,10 +89,10 @@ def auth_callback():
 
     redirect_uri = flask.current_app.config['REDIRECT_URL']
     always_use_client_url = flask.current_app.config['ALWAYS_USE_CLIENT_URL']
-    success = authentication_callback(extensions.backend.backend, auth_code, state, provider, redirect_uri,
+    success, data = authentication_callback(extensions.backend.backend, auth_code, state, provider, redirect_uri,
                                       always_use_client_url)
 
-    return jsonify({"status": success})
+    return jsonify({"status": success, "data": data})
 
 
 @webserver_bp.route("/api/check_user_perms")
@@ -104,7 +104,7 @@ def check_user_perms():
 
     provider = lookup_provider_from_profile(profile_url)
     configuration = extensions.backend.backend.get_configuration_token(issuer=provider, profile=profile_url)
-    has_permission = configuration is not None
+    has_permission = configuration is not None and bool(configuration.data)
 
     return jsonify({"has_permission": has_permission})
 
@@ -119,10 +119,10 @@ def add_score_status():
     if result.failed():
         if isinstance(result.result, SolidError):
             # This is a known failure mode, one of our custom exceptions
-            return jsonify({"status": "error", "container": str(result.result)})
+            return jsonify({"status": "error", "error": str(result.result)})
         else:
             # An unknown failure mode
-            return jsonify({"status": "unknown", "container": str(result.result)})
+            return jsonify({"status": "unknown", "error": str(result.result)})
     else:
         if result.ready():
             # Finished

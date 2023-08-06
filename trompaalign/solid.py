@@ -82,6 +82,7 @@ def patch_container_item_title(provider, profile, container, item, title):
 }}"""
 
     r = requests.patch(container, data=update_data, headers=headers)
+    r.raise_for_status()
     print(r.text)
     print(f"Status: {r.status_code}")
 
@@ -181,6 +182,7 @@ def upload_mei_to_pod(provider, profile, storage, payload):
     # TODO: Should this be an XML mimetype, or a specific MEI one?
     headers["content-type"] = "application/xml"
     r = requests.put(resource, data=payload.encode("utf-8"), headers=headers)
+    r.raise_for_status()
     print(r.text)
     return resource
 
@@ -192,6 +194,7 @@ def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
     headers["content-type"] = "application/json"
     r = requests.put(resource, data=payload, headers=headers)
+    r.raise_for_status()
     print("status:", r.text)
     return resource
 
@@ -202,6 +205,7 @@ def upload_midi_to_pod(provider, profile, storage, payload: bytes):
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
     headers["content-type"] = "audio/midi"
     r = requests.put(resource, data=payload, headers=headers)
+    r.raise_for_status()
     print("status:", r.text)
     return resource
 
@@ -211,6 +215,7 @@ def upload_mp3_to_pod(provider, profile, resource, payload: bytes):
     headers = get_bearer_for_user(provider, profile, resource, 'PUT')
     headers["content-type"] = "audio/mpeg"
     r = requests.put(resource, data=payload, headers=headers)
+    r.raise_for_status()
     print("status:", r.text)
     return resource
 
@@ -261,23 +266,27 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     print("Making performance container:", performance_resource)
     headers = get_bearer_for_user(provider, profile, performance_resource, 'PUT')
     r = requests.put(performance_resource, headers=headers)
+    r.raise_for_status()
     print(r.text)
 
     print("Making timeline container:", timeline_resource)
     headers = get_bearer_for_user(provider, profile, timeline_resource, 'PUT')
     r = requests.put(timeline_resource, headers=headers)
+    r.raise_for_status()
     print(r.text)
 
     print("Making score:", score_resource)
     headers = get_bearer_for_user(provider, profile, score_resource, 'PUT')
     headers["content-type"] = "text/turtle"
     r = requests.put(score_resource, data=score_data, headers=headers)
+    r.raise_for_status()
     print(r.text)
 
     print("Making segment:", segment_resource)
     headers = get_bearer_for_user(provider, profile, segment_resource, 'PUT')
     headers["content-type"] = "text/turtle"
     r = requests.put(segment_resource, data=segmentation_data, headers=headers)
+    r.raise_for_status()
     print(r.text)
 
     return score_resource
@@ -330,6 +339,7 @@ def save_performance_manifest(provider, profile, performance_uri, manifest):
     headers = get_bearer_for_user(provider, profile, performance_uri, 'PUT')
     headers["content-type"] = "text/turtle"
     r = requests.put(performance_uri, data=manifest, headers=headers)
+    r.raise_for_status()
     print("status:", r.text)
 
 
@@ -338,4 +348,5 @@ def save_performance_timeline(provider, profile, timeline_uri, timeline):
     headers = get_bearer_for_user(provider, profile, timeline_uri, 'PUT')
     headers["content-type"] = "application/ld+json"
     r = requests.put(timeline_uri, data=json.dumps(timeline), headers=headers)
+    r.raise_for_status()
     print("status:", r.text)
