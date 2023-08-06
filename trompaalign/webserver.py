@@ -154,15 +154,6 @@ def align():
     score_url = request.form.get('score')
     profile = request.form.get('profile')
 
-    print("MIDI TYPE", midi_type)
-    print("SCORE URL", score_url)
-    print("PROFILE", profile)
-    #webmidi_url = request.args.get('webmidi_url')
-    #midi_url = request.args.get('midi_url')
-
-    # if webmidi_url and midi_url:
-    #     return jsonify({"status": "error", "message": "Must have only one of webmidi_url or midi_url"}), 400
-
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
 
@@ -176,7 +167,6 @@ def align():
     else:
         return jsonify({"status": "error", "message": "Must have midi_type of webmidi or midi"}), 400
 
-    # profile, score_url, webmidi_url, midi_url
     task = tasks.align_recording.delay(profile, score_url, webmidi_url, midi_url)
     print("made task", task.task_id)
     return jsonify({"status": "queued", "task_id": task.task_id})
