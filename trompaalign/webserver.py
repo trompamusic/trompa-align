@@ -203,4 +203,7 @@ def catch_all(path):
         user_file = path
     else:
         user_path, user_file = path.rsplit("/", 1)
-    return flask.send_from_directory(os.path.join('/clara', user_path), user_file)
+    if os.path.exists(os.path.join(os.path.join('/clara', user_path), user_file)):
+        return flask.send_from_directory(os.path.join('/clara', user_path), user_file)
+    else:
+        return flask.send_from_directory('/clara', 'index.html')
