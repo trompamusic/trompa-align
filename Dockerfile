@@ -4,7 +4,7 @@ FROM python:3.11
 RUN apt-get update \
     && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm \
     fluid-soundfont-gs tzdata wget git unzip make r-base \
-    libharfbuzz-dev libfribidi-dev \
+    libharfbuzz-dev libfribidi-dev less \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /usr/share/soundfonts

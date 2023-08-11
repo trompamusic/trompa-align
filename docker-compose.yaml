@@ -17,6 +17,7 @@ services:
       - run
       - --host=0.0.0.0
     volumes:
+      - "./.root-home:/root"
       - ".:/code"
 
   redis:
