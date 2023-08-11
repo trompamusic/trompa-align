@@ -8,7 +8,10 @@ if(length(args) < 3 || length(args) > 4) {
 
 # load libraries
 
-library(tidyverse) # for dplyr, maggritr and friends
+library(dplyr)
+library(magrittr)
+library(readr)
+library(stringr)
 library(jsonlite) # for read_json
 library(fuzzyjoin) # for difference_inner_join
 library(glue) # for interpolated string niceness
