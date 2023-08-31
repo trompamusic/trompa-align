@@ -194,7 +194,7 @@ traitlets==5.9.0
     # via
     #   ipython
     #   matplotlib-inline
-trompa-solid @ git+https://github.com/trompamusic/solid-oidc-app-permission.git@a8f64af
+trompa-solid @ git+https://github.com/trompamusic/solid-oidc-app-permission.git@d3fc0f52
     # via -r requirements.in
 typing-extensions==4.4.0
     # via
