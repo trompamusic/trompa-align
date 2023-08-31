@@ -164,7 +164,7 @@ def graph_to_jsonld(g, mei_uri=None, tl_uri=None):
 
 
 def graph_to_turtle(g):
-    return g.serialize(format='n3')
+    return g.serialize(format='n3', encoding='utf-8')
 
 
 def generate_structural_segmentation(meiFile):

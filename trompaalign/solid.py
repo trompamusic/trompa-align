@@ -260,8 +260,8 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     segmentation_graph = segmentation_to_graph(segmentation, segment_resource)
     score_graph = score_to_graph(score_resource, segment_resource, performance_resource, mei_external_uri, mei_copy_uri, title)
 
-    segmentation_data = segmentation_graph.serialize(format='n3')
-    score_data = score_graph.serialize(format='n3')
+    segmentation_data = segmentation_graph.serialize(format='n3', encoding='utf-8')
+    score_data = score_graph.serialize(format='n3', encoding='utf-8')
 
     print("Making performance container:", performance_resource)
     headers = get_bearer_for_user(provider, profile, performance_resource, 'PUT')
@@ -347,6 +347,6 @@ def save_performance_timeline(provider, profile, timeline_uri, timeline):
     print(f"Uploading timeline to {timeline_uri}")
     headers = get_bearer_for_user(provider, profile, timeline_uri, 'PUT')
     headers["content-type"] = "application/ld+json"
-    r = requests.put(timeline_uri, data=json.dumps(timeline), headers=headers)
+    r = requests.put(timeline_uri, data=json.dumps(timeline).encode('utf-8'), headers=headers)
     r.raise_for_status()
     print("status:", r.text)
