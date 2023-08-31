@@ -182,10 +182,10 @@ def align_status():
     if result.failed():
         if isinstance(result.result, SolidError):
             # This is a known failure mode, one of our custom exceptions
-            return jsonify({"status": "error", "message": str(result.result)})
+            return jsonify({"status": "error", "error": str(result.result)})
         else:
             # An unknown failure mode
-            return jsonify({"status": "unknown", "message": str(result.result)})
+            return jsonify({"status": "unknown", "error": str(result.result)})
     else:
         if result.ready():
             # Finished
