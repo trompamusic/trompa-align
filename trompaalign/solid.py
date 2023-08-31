@@ -161,18 +161,18 @@ def lookup_provider_from_profile(profile_url: str):
             raise e
 
 
-def get_title_from_mei(payload):
+def get_title_from_mei(payload, filename):
     metadata = get_metadata_for_mei(payload)
-    title = ""
-    if metadata["title"]:
-        title += metadata["title"]
-    if metadata["composer"]:
-        title += " - " + metadata["composer"]
-    if title:
-        return title
+    if metadata:
+        title = ""
+        if metadata["title"]:
+            title += metadata["title"]
+        if metadata["composer"]:
+            title += " - " + metadata["composer"]
+        if title:
+            return title
     else:
-        print("Error: Cannot find title in the MEI")
-        return
+        return filename
 
 
 def upload_mei_to_pod(provider, profile, storage, payload):

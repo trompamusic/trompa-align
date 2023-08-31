@@ -13,10 +13,12 @@ from scripts.convert_to_rdf import graph_to_turtle, graph_to_jsonld
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
+from trompaalign.mei import get_metadata_for_mei, mei_is_valid
 from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, \
     create_clara_container, upload_mei_to_pod, \
     get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, \
-    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest, save_performance_timeline
+    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest, save_performance_timeline, \
+    SolidError
 
 
 class NoSuchScoreException(Exception):
@@ -67,7 +69,12 @@ def add_score(profile, mei_external_uri):
     r.raise_for_status()
     payload = r.text
 
-    title = get_title_from_mei(payload)
+    is_valid = mei_is_valid(payload)
+    if not is_valid:
+        raise SolidError("MEI file is not valid")
+
+    filename = os.path.basename(mei_external_uri)
+    title = get_title_from_mei(payload, filename)
     mei_copy_uri = upload_mei_to_pod(provider, profile, storage, payload)
 
     return create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)

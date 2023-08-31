@@ -285,13 +285,15 @@ def cmd_upload_score_to_pod(profile, url, file, title):
     elif url and file:
         print("URL and File set, loading file from disk and using url as source")
         payload = open(file).read()
+        filename = os.path.basename(file)
     else:
         print(f"Downloading file from {url}")
+        filename = os.path.basename(url)
         r = requests.get(url)
         r.raise_for_status()
         payload = r.text
 
-    title = get_title_from_mei(payload)
+    title = get_title_from_mei(payload, filename)
     mei_copy_uri = upload_mei_to_pod(provider, profile, storage, payload)
 
     create_and_save_structure(provider, profile, storage, title, payload, url, mei_copy_uri)
