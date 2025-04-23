@@ -11,7 +11,7 @@ def mei_is_valid(mei_text):
     try:
         etree.parse(s)
         return True
-    except etree.XMLSyntaxError as e:
+    except etree.XMLSyntaxError:
         return False
 
 
@@ -22,7 +22,7 @@ def get_metadata_for_mei(mei_text):
     s = BytesIO(mei_text.encode())
     try:
         tree = etree.parse(s)
-    except etree.XMLSyntaxError as e:
+    except etree.XMLSyntaxError:
         return None
     ns = {"mei": "http://www.music-encoding.org/ns/mei"}
     e = tree.find("//mei:titleStmt", namespaces=ns)

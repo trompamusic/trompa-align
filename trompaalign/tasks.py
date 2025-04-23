@@ -7,28 +7,28 @@ import uuid
 import rdflib
 import requests
 from celery import shared_task
-from rdflib import URIRef, RDF, SKOS
+from rdflib import RDF, SKOS, URIRef
 
-from scripts.convert_to_rdf import graph_to_turtle, graph_to_jsonld
+from scripts.convert_to_rdf import graph_to_jsonld, graph_to_turtle
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
-from trompaalign.mei import get_metadata_for_mei, mei_is_valid
+from trompaalign.mei import mei_is_valid
 from trompaalign.solid import (
-    lookup_provider_from_profile,
-    get_storage_from_profile,
-    create_clara_container,
-    upload_mei_to_pod,
-    get_title_from_mei,
-    create_and_save_structure,
-    get_resource_from_pod,
     CLARA_CONTAINER_NAME,
+    SolidError,
+    create_and_save_structure,
+    create_clara_container,
     get_pod_listing,
-    upload_midi_to_pod,
-    upload_mp3_to_pod,
+    get_resource_from_pod,
+    get_storage_from_profile,
+    get_title_from_mei,
+    lookup_provider_from_profile,
     save_performance_manifest,
     save_performance_timeline,
-    SolidError,
+    upload_mei_to_pod,
+    upload_midi_to_pod,
+    upload_mp3_to_pod,
 )
 
 
@@ -71,7 +71,7 @@ def add_score(profile, mei_external_uri):
         return
 
     try:
-        clara_container = get_pod_listing(provider, profile, storage)
+        get_pod_listing(provider, profile, storage)
     except urllib.error.HTTPError as e:
         if e.status == 404:
             create_clara_container(provider, profile, storage)

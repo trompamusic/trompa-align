@@ -10,7 +10,7 @@ def generate_notes_from_mei(mei_file, expansion):
     print("VERSION", tk.getVersion())
     try:
         tk.loadFile(mei_file)
-    except:
+    except Exception:
         print(f"Python: Could not load MEI file: {mei_file}")
 
     print("Python: Rendering to MIDI")

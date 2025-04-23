@@ -3,7 +3,6 @@
 import json
 import csv
 import io
-from pathlib import Path
 
 
 def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
