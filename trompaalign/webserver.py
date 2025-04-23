@@ -12,8 +12,13 @@ from trompasolid.backend.db_backend import DBBackend
 from trompaalign import extensions, tasks
 from trompasolid import client
 
-from trompaalign.solid import SolidError, lookup_provider_from_profile, upload_webmidi_to_pod, upload_midi_to_pod, \
-    get_storage_from_profile
+from trompaalign.solid import (
+    SolidError,
+    lookup_provider_from_profile,
+    upload_webmidi_to_pod,
+    upload_midi_to_pod,
+    get_storage_from_profile,
+)
 
 
 def celery_init_app(app: flask.Flask) -> Celery:
@@ -24,7 +29,7 @@ def celery_init_app(app: flask.Flask) -> Celery:
 
     celery_app = Celery(app.name, task_cls=FlaskTask)
     celery_app.config_from_object(app.config["CELERY"])
-    celery_app.autodiscover_tasks(['trompaalign'], force=True)
+    celery_app.autodiscover_tasks(["trompaalign"], force=True)
     celery_app.set_default()
     app.extensions["celery"] = celery_app
     return celery_app
@@ -39,21 +44,21 @@ def create_app():
     extensions.cors.init_app(app)
     client.set_backend(DBBackend(extensions.db.session))
 
-    if app.config['SENTRY_DSN']:
+    if app.config["SENTRY_DSN"]:
         sentry_sdk.init(
-            dsn=app.config['SENTRY_DSN'],
+            dsn=app.config["SENTRY_DSN"],
             integrations=[
                 FlaskIntegration(),
                 CeleryIntegration(),
             ],
-            traces_sample_rate=1.0
+            traces_sample_rate=1.0,
         )
 
     celery_init_app(app)
     return app
 
 
-webserver_bp = flask.Blueprint('trompaalign', __name__)
+webserver_bp = flask.Blueprint("trompaalign", __name__)
 
 
 @webserver_bp.route("/api/auth/request", methods=["POST"])
@@ -61,15 +66,15 @@ def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
 
-    redirect_url = flask.current_app.config['REDIRECT_URL']
-    always_use_client_url = flask.current_app.config['ALWAYS_USE_CLIENT_URL']
+    redirect_url = flask.current_app.config["REDIRECT_URL"]
+    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
     try:
         data = generate_authentication_url(extensions.backend.backend, webid, redirect_url, always_use_client_url)
 
-        provider = data['provider']
-        flask.session['provider'] = provider
-        flask.session['redirect_after'] = redirect_after
-        log_messages = data.get('log_messages', [])
+        provider = data["provider"]
+        flask.session["provider"] = provider
+        flask.session["redirect_after"] = redirect_after
+        log_messages = data.get("log_messages", [])
         print("AUTH LOG")
         for log_message in log_messages:
             print(" ", log_message)
@@ -82,22 +87,23 @@ def auth_request():
 
 @webserver_bp.route("/api/auth/callback", methods=["POST"])
 def auth_callback():
-    auth_code = flask.request.form.get('code')
-    state = flask.request.form.get('state')
+    auth_code = flask.request.form.get("code")
+    state = flask.request.form.get("state")
 
-    provider = flask.session['provider']
+    provider = flask.session["provider"]
 
-    redirect_uri = flask.current_app.config['REDIRECT_URL']
-    always_use_client_url = flask.current_app.config['ALWAYS_USE_CLIENT_URL']
-    success, data = authentication_callback(extensions.backend.backend, auth_code, state, provider, redirect_uri,
-                                      always_use_client_url)
+    redirect_uri = flask.current_app.config["REDIRECT_URL"]
+    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
+    success, data = authentication_callback(
+        extensions.backend.backend, auth_code, state, provider, redirect_uri, always_use_client_url
+    )
 
     return jsonify({"status": success, "data": data})
 
 
 @webserver_bp.route("/api/check_user_perms")
 def check_user_perms():
-    """Check if the given user has permissions in the backend to """
+    """Check if the given user has permissions in the backend to"""
     profile_url = request.args.get("profile")
     if not profile_url:
         return jsonify({"status": "error"}), 400
@@ -148,11 +154,11 @@ def add_score():
 
 @webserver_bp.route("/api/align", methods=["POST"])
 def align():
-    file = request.files.get('file')
+    file = request.files.get("file")
     payload = file.read()
-    midi_type = request.form.get('midi_type')
-    score_url = request.form.get('score')
-    profile = request.form.get('profile')
+    midi_type = request.form.get("midi_type")
+    score_url = request.form.get("score")
+    profile = request.form.get("profile")
 
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
@@ -195,15 +201,15 @@ def align_status():
             return jsonify({"status": "pending"})
 
 
-@webserver_bp.route('/', defaults={'path': 'index.html'})
-@webserver_bp.route('/<path:path>')
+@webserver_bp.route("/", defaults={"path": "index.html"})
+@webserver_bp.route("/<path:path>")
 def catch_all(path):
     if "/" not in path:
         user_path = ""
         user_file = path
     else:
         user_path, user_file = path.rsplit("/", 1)
-    if os.path.exists(os.path.join(os.path.join('/clara', user_path), user_file)):
-        return flask.send_from_directory(os.path.join('/clara', user_path), user_file)
+    if os.path.exists(os.path.join(os.path.join("/clara", user_path), user_file)):
+        return flask.send_from_directory(os.path.join("/clara", user_path), user_file)
     else:
-        return flask.send_from_directory('/clara', 'index.html')
+        return flask.send_from_directory("/clara", "index.html")

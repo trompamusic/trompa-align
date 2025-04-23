@@ -54,10 +54,7 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
     merged = []
     for note in smat_aligned_notes:
         for attr in attrs_list:
-            if (
-                abs(note["tstamp"] - attr["tstamp"]) <= threshold
-                and note["refPitch"] == attr["midiPitch"]
-            ):
+            if abs(note["tstamp"] - attr["tstamp"]) <= threshold and note["refPitch"] == attr["midiPitch"]:
                 merged.append({**note, **attr})
                 break
 
@@ -71,9 +68,7 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
 
     # Find non-reconciled notes
     matched_ref_ids = {note["refID"] for note in matched.values()}
-    non_reconciled = [
-        note for note in smat_aligned_notes if note["refID"] not in matched_ref_ids
-    ]
+    non_reconciled = [note for note in smat_aligned_notes if note["refID"] not in matched_ref_ids]
     print(f"{len(non_reconciled)} match failures.")
 
     # Prepare MAPS export

@@ -14,11 +14,22 @@ from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from trompaalign.mei import get_metadata_for_mei, mei_is_valid
-from trompaalign.solid import lookup_provider_from_profile, get_storage_from_profile, \
-    create_clara_container, upload_mei_to_pod, \
-    get_title_from_mei, create_and_save_structure, get_resource_from_pod, CLARA_CONTAINER_NAME, \
-    get_pod_listing, upload_midi_to_pod, upload_mp3_to_pod, save_performance_manifest, save_performance_timeline, \
-    SolidError
+from trompaalign.solid import (
+    lookup_provider_from_profile,
+    get_storage_from_profile,
+    create_clara_container,
+    upload_mei_to_pod,
+    get_title_from_mei,
+    create_and_save_structure,
+    get_resource_from_pod,
+    CLARA_CONTAINER_NAME,
+    get_pod_listing,
+    upload_midi_to_pod,
+    upload_mp3_to_pod,
+    save_performance_manifest,
+    save_performance_timeline,
+    SolidError,
+)
 
 
 class NoSuchScoreException(Exception):
@@ -105,7 +116,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
     with tempfile.TemporaryDirectory() as td:
         score = get_resource_from_pod(provider, profile, score_url)
         graph = rdflib.Graph()
-        graph.parse(data=score, format='n3')
+        graph.parse(data=score, format="n3")
         # e.g., find all triples where `<someuri> a mo:score`
         # triples = list(graph.triples((None, RDF.type, MO.Score)))
         # However, we know what the someuri is, it's score_url
@@ -116,7 +127,9 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
             external_mei_url = triples[0][2]
             print(f"External MEI file is {external_mei_url}")
         else:
-            raise NoSuchScoreException(f"Cannot find external location of MEI file given the score resource {score_url}")
+            raise NoSuchScoreException(
+                f"Cannot find external location of MEI file given the score resource {score_url}"
+            )
 
         triples = list(graph.triples((uri_ref, SKOS.related, None)))
         if triples:
@@ -127,7 +140,9 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
             print(f"Performance container is {performance_container}")
             print(f"Timeline container is {timeline_container}")
         else:
-            raise NoSuchPerformanceException(f"Cannot find location of performance container given the score resource {score_url}")
+            raise NoSuchPerformanceException(
+                f"Cannot find location of performance container given the score resource {score_url}"
+            )
 
         mei_content = get_resource_from_pod(provider, profile, external_mei_url)
 
@@ -152,10 +167,20 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         expansion = None
         audio_container = os.path.join(clara_container, "audio")
         perf_fname = str(uuid.uuid4())
-        audio_fname = str(uuid.uuid4()) + '.mp3'
+        audio_fname = str(uuid.uuid4()) + ".mp3"
         performance_graph, timeline_graph = perform_workflow(
-            midi_file, mei_file, expansion, external_mei_url, score_url, performance_container,
-            timeline_container, audio_container, td, perf_fname, audio_fname)
+            midi_file,
+            mei_file,
+            expansion,
+            external_mei_url,
+            score_url,
+            performance_container,
+            timeline_container,
+            audio_container,
+            td,
+            perf_fname,
+            audio_fname,
+        )
 
         performance_resource = os.path.join(performance_container, perf_fname)
         print(f"Performance resource: {performance_resource}")

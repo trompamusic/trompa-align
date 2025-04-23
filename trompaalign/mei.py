@@ -35,10 +35,7 @@ def get_metadata_for_mei(mei_text):
             str_title = title.text
         if composer is not None:
             str_composer = composer.text
-    return {
-        "title": str_title,
-        "composer": str_composer
-    }
+    return {"title": str_title, "composer": str_composer}
 
 
 def compute_sha256_for_mei(mei_text):

@@ -81,12 +81,12 @@ def perform_workflow(
     :return:
     """
     if mei_file is not None:
-        with open(mei_file, 'r') as f:
+        with open(mei_file, "r") as f:
             mei_data = f.read()
     else:
         resp = requests.get(mei_uri)
         mei_data = resp.text
-        with open(os.path.join(tempdir, "score.mei"), 'w') as out:
+        with open(os.path.join(tempdir, "score.mei"), "w") as out:
             out.write(mei_data)
         mei_file = os.path.join(tempdir, "score.mei")
     print("** Performing MEI_TO_MIDI")
@@ -148,8 +148,6 @@ def perform_workflow(
         maps_json, mei_uri, timeline_uri, score_uri, audio_uri, includePerformance=False
     )
 
-    performance_graph = performance_to_graph(
-        performance_uri, timeline_uri, score_uri, audio_uri
-    )
+    performance_graph = performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri)
     print("** Success: Created timeline output: ", perf_fname)
     return performance_graph, timeline_graph

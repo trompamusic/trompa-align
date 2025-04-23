@@ -17,7 +17,7 @@ def midi_to_mp3(midifile, output, tempdir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--midiFile', '-m', help="Path to a MIDI file", required=True)
-    parser.add_argument('--output', '-o', help="Name of output MP3 file to generate", required=True)
+    parser.add_argument("--midiFile", "-m", help="Path to a MIDI file", required=True)
+    parser.add_argument("--output", "-o", help="Name of output MP3 file to generate", required=True)
     args = parser.parse_args()
     midi_to_mp3(args.midiFile, args.output, tempfile.mkdtemp())

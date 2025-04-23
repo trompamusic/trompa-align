@@ -7,11 +7,23 @@ import requests
 import requests.utils
 from trompasolid.client import get_bearer_for_user
 
-from trompaalign.solid import get_storage_from_profile, lookup_provider_from_profile, get_pod_listing, \
-    CLARA_CONTAINER_NAME, create_clara_container, upload_mei_to_pod, \
-    create_and_save_structure, get_title_from_mei, upload_webmidi_to_pod, \
-    get_contents_of_container, find_score_for_external_uri, upload_midi_to_pod, get_pod_listing_ttl, \
-    patch_container_item_title, http_options
+from trompaalign.solid import (
+    get_storage_from_profile,
+    lookup_provider_from_profile,
+    get_pod_listing,
+    CLARA_CONTAINER_NAME,
+    create_clara_container,
+    upload_mei_to_pod,
+    create_and_save_structure,
+    get_title_from_mei,
+    upload_webmidi_to_pod,
+    get_contents_of_container,
+    find_score_for_external_uri,
+    upload_midi_to_pod,
+    get_pod_listing_ttl,
+    patch_container_item_title,
+    http_options,
+)
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -20,8 +32,7 @@ cli = AppGroup("solid", help="Solid commands")
 @cli.command("list-pod")
 @click.argument("profile")
 def cmd_list_containers_in_pod(profile):
-    """List containers in a pod.
-    """
+    """List containers in a pod."""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -36,9 +47,9 @@ def cmd_list_containers_in_pod(profile):
     print("Pod containers:")
     print(f"{provider=} {profile=}")
     listing = get_pod_listing(provider, profile, storage)
-    for item in listing['@graph']:
-        if 'ldp:BasicContainer' in item.get('@type', []):
-            print(" ", item.get('@id'))
+    for item in listing["@graph"]:
+        if "ldp:BasicContainer" in item.get("@type", []):
+            print(" ", item.get("@id"))
 
 
 @cli.command("list-container")
@@ -122,7 +133,6 @@ def cmd_add_clara_to_pod(profile):
     create_clara_container(provider, profile, storage)
 
 
-
 @cli.command("get-resource")
 @click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
@@ -135,7 +145,7 @@ def cmd_get_resource(use_json, profile, resource):
         print("Cannot find provider, quitting")
         return
 
-    headers = get_bearer_for_user(provider, profile, resource, 'GET')
+    headers = get_bearer_for_user(provider, profile, resource, "GET")
     if use_json:
         type_headers = {"Accept": "application/ld+json"}
     else:
@@ -196,21 +206,21 @@ def recursive_delete_from_pod(provider, profile, container):
     After recursing into it, delete the container itself, as it'll be empty.
     """
     listing = get_pod_listing(provider, profile, container)
-    for item in listing.get('@graph', []):
-        item_id = item['@id']
+    for item in listing.get("@graph", []):
+        item_id = item["@id"]
         # First item is ourselves, skip it
         if item_id == container:
             continue
-        if "ldp:Container" in item['@type']:
+        if "ldp:Container" in item["@type"]:
             # If the container has other containers, delete them
-            recursive_delete_from_pod(provider, profile, item['@id'])
+            recursive_delete_from_pod(provider, profile, item["@id"])
         else:
             # Otherwise it's just a file, delete it.
-            headers = get_bearer_for_user(provider, profile, item_id, 'DELETE')
+            headers = get_bearer_for_user(provider, profile, item_id, "DELETE")
             print(f"Delete file {item_id}")
             requests.delete(item_id, headers=headers)
     # Finally, delete the container itself
-    headers = get_bearer_for_user(provider, profile, container, 'DELETE')
+    headers = get_bearer_for_user(provider, profile, container, "DELETE")
     requests.delete(container, headers=headers)
 
 
@@ -253,7 +263,7 @@ def cmd_delete_resource(profile, resource):
         print("Cannot find provider, quitting")
         return
 
-    headers = get_bearer_for_user(provider, profile, resource, 'DELETE')
+    headers = get_bearer_for_user(provider, profile, resource, "DELETE")
     requests.delete(resource, headers=headers)
 
 
@@ -356,7 +366,7 @@ def add_turtle(profile, resource, file):
 
     payload = open(file, "rb").read()
     print(f"Uploading file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(resource, data=payload, headers=headers)
     print(r.text)
@@ -377,9 +387,10 @@ def get_turtle(profile, resource):
         return
 
     print(f"Getting file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'GET')
+    headers = get_bearer_for_user(provider, profile, resource, "GET")
     r = requests.get(resource, headers=headers)
     print(r.text)
+
 
 @cli.command("options")
 @click.argument("profile")
@@ -399,12 +410,12 @@ def cmd_options(profile, resource):
 
 
 @cli.command("align-recording")
-@click.option("--midi/--webmidi", 'is_midi')
+@click.option("--midi/--webmidi", "is_midi")
 @click.argument("profile")
 @click.argument("score_url")
 @click.argument("midi_url")
 def cmd_align_recording(is_midi, profile, score_url, midi_url):
-    """Run the alignment process """
+    """Run the alignment process"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")

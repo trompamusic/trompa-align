@@ -36,23 +36,56 @@ def smat_align(file1, file2):
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_hmm.txt")):
             raise Exception(f"hmm of first file, {file1_stem}_hmm.txt, doesn't exist")
 
-        subprocess.run(["ScorePerfmMatcher", f"{file1_stem}_hmm.txt", f"{file2_stem}_spr.txt",
-                        f"{file2_stem}_pre_match.txt", "0.001"], cwd=tempdir)
+        subprocess.run(
+            [
+                "ScorePerfmMatcher",
+                f"{file1_stem}_hmm.txt",
+                f"{file2_stem}_spr.txt",
+                f"{file2_stem}_pre_match.txt",
+                "0.001",
+            ],
+            cwd=tempdir,
+        )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_pre_match.txt")):
             raise Exception(f"pre_match of second file, {file2_stem}_pre_match.txt, doesn't exist")
 
-        subprocess.run(["ErrorDetection", f"{file1_stem}_fmt3x.txt", f"{file1_stem}_hmm.txt",
-                        f"{file2_stem}_pre_match.txt", f"{file2_stem}_err_match.txt", "0"], cwd=tempdir)
+        subprocess.run(
+            [
+                "ErrorDetection",
+                f"{file1_stem}_fmt3x.txt",
+                f"{file1_stem}_hmm.txt",
+                f"{file2_stem}_pre_match.txt",
+                f"{file2_stem}_err_match.txt",
+                "0",
+            ],
+            cwd=tempdir,
+        )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_err_match.txt")):
             raise Exception(f"err_match of second file, {file2_stem}_err_match.txt, doesn't exist")
 
-        subprocess.run(["RealignmentMOHMM", f"{file1_stem}_fmt3x.txt", f"{file1_stem}_hmm.txt",
-                        f"{file2_stem}_err_match.txt", f"{file2_stem}_realigned_match.txt", "0.3"], cwd=tempdir)
+        subprocess.run(
+            [
+                "RealignmentMOHMM",
+                f"{file1_stem}_fmt3x.txt",
+                f"{file1_stem}_hmm.txt",
+                f"{file2_stem}_err_match.txt",
+                f"{file2_stem}_realigned_match.txt",
+                "0.3",
+            ],
+            cwd=tempdir,
+        )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_realigned_match.txt")):
             raise Exception(f"realigned_match of second file, {file2_stem}_realigned_match.txt, doesn't exist")
 
-        subprocess.run(["MatchToCorresp", f"{file2_stem}_realigned_match.txt", f"{file1_stem}_spr.txt",
-                        f"{file2_stem}_corresp.txt"], cwd=tempdir)
+        subprocess.run(
+            [
+                "MatchToCorresp",
+                f"{file2_stem}_realigned_match.txt",
+                f"{file1_stem}_spr.txt",
+                f"{file2_stem}_corresp.txt",
+            ],
+            cwd=tempdir,
+        )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_corresp.txt")):
             raise Exception(f"end result of second file, {file2_stem}_corresp.txt.txt, doesn't exist")
 
@@ -62,20 +95,19 @@ def smat_align(file1, file2):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--canonicalMIDI', '-c',
-                        help="Absolute path to a canonical MIDI file (e.g., generated from MEI)", required=True)
-    parser.add_argument('--performanceMIDI', '-p', help="Absolute path to a MIDI file recording a performance",
-                        required=True)
-    parser.add_argument('--SMAT', '-s', help="Absolute path of unzipped Symbolic Music Alignment Tool directory",
-                        required=True)
-    parser.add_argument('--out', '-o', help="Absolute path of corresp file to generate as output", required=True)
+    parser.add_argument(
+        "--canonicalMIDI", "-c", help="Absolute path to a canonical MIDI file (e.g., generated from MEI)", required=True
+    )
+    parser.add_argument(
+        "--performanceMIDI", "-p", help="Absolute path to a MIDI file recording a performance", required=True
+    )
+    parser.add_argument(
+        "--SMAT", "-s", help="Absolute path of unzipped Symbolic Music Alignment Tool directory", required=True
+    )
+    parser.add_argument("--out", "-o", help="Absolute path of corresp file to generate as output", required=True)
     args = parser.parse_args()
 
-    if not (
-            os.path.isabs(args.canonicalMIDI) and
-            os.path.isabs(args.performanceMIDI) and
-            os.path.isabs(args.SMAT)
-    ):
+    if not (os.path.isabs(args.canonicalMIDI) and os.path.isabs(args.performanceMIDI) and os.path.isabs(args.SMAT)):
         sys.exit("Please supply all parameters as absolute paths")
     # SMAT expects MIDI files to live inside the SMAT directory.
     # Copy them over there temporarily, do the alignment, then delete the tmp files
@@ -90,13 +122,7 @@ if __name__ == "__main__":
         sys.exit("Unexpected error:", sys.exc_info())
     mainDir = os.getcwd()
     os.chdir(smatPath)
-    os.system("./MIDIToMIDIAlign.sh {c} {p}"
-    .format(
-        SMAT=args.SMAT,
-        c=tmpUuid + "canonical",
-        p=tmpUuid + "performance"
-    )
-    )
+    os.system("./MIDIToMIDIAlign.sh {c} {p}".format(SMAT=args.SMAT, c=tmpUuid + "canonical", p=tmpUuid + "performance"))
     # Hopefully SMAT has generated a corresp file, along with a bunch of other stuff
     # We only need the corresp file. Copy it out to our output path
     os.chdir(mainDir)

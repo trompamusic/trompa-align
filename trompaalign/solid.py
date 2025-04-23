@@ -21,13 +21,13 @@ class SolidError(Exception):
 
 
 jsonld_context = {
-    'mo': 'http://purl.org/ontology/mo/',
-    'dcterms': 'http://purl.org/dc/terms/',
-    'ldp': 'http://www.w3.org/ns/ldp#',
-    'stat': 'http://www.w3.org/ns/posix/stat#',
-    'mime': 'http://www.w3.org/ns/iana/media-types/',
-    'schema': 'https://schema.org/about/',
-    'oa': 'http://www.w3.org/ns/oa',
+    "mo": "http://purl.org/ontology/mo/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "ldp": "http://www.w3.org/ns/ldp#",
+    "stat": "http://www.w3.org/ns/posix/stat#",
+    "mime": "http://www.w3.org/ns/iana/media-types/",
+    "schema": "https://schema.org/about/",
+    "oa": "http://www.w3.org/ns/oa",
 }
 
 
@@ -35,14 +35,14 @@ CLARA_CONTAINER_NAME = "at.ac.mdw.trompa/"
 
 
 def http_options(provider, profile, container):
-    headers = get_bearer_for_user(provider, profile, container, 'OPTIONS')
+    headers = get_bearer_for_user(provider, profile, container, "OPTIONS")
     r = requests.options(container, headers=headers)
     r.raise_for_status()
     return r.headers, r.content
 
 
 def get_pod_listing(provider, profile, storage):
-    headers = get_bearer_for_user(provider, profile, storage, 'GET')
+    headers = get_bearer_for_user(provider, profile, storage, "GET")
     resp = get_uri_jsonld(storage, headers)
     if resp is not None:
         compact = jsonld.compact(resp, jsonld_context)
@@ -52,7 +52,7 @@ def get_pod_listing(provider, profile, storage):
 
 
 def get_pod_listing_ttl(provider, profile, storage):
-    headers = get_bearer_for_user(provider, profile, storage, 'GET')
+    headers = get_bearer_for_user(provider, profile, storage, "GET")
     return get_uri_ttl(storage, headers)
 
 
@@ -72,7 +72,7 @@ def patch_container_item_title(provider, profile, container, item, title):
     data related to the container other than the filesystem data (date created, etc)
     """
 
-    headers = get_bearer_for_user(provider, profile, container, 'PATCH')
+    headers = get_bearer_for_user(provider, profile, container, "PATCH")
     type_headers = {"Accept": "text/turtle", "content-type": "application/sparql-update"}
     headers.update(type_headers)
 
@@ -92,19 +92,19 @@ def get_contents_of_container(container, container_name):
     for item in container["@graph"]:
         # This returns 1 item for the actual url, which has ldp:contains: [list, of items]
         # but then also enumerates the list of items
-        if item['@id'] == container_name:
-            contains = item.get('ldp:contains')
+        if item["@id"] == container_name:
+            contains = item.get("ldp:contains")
             if not contains:
                 return []
             if not isinstance(contains, list):
                 contains = [contains]
             for cont in contains:
-                contents.append(cont['@id'])
+                contents.append(cont["@id"])
     return contents
 
 
 def get_resource_from_pod(provider, profile, uri, accept=None):
-    headers = get_bearer_for_user(provider, profile, uri, 'GET')
+    headers = get_bearer_for_user(provider, profile, uri, "GET")
     if accept:
         headers.update({"Accept": accept})
     r = requests.get(uri, headers=headers)
@@ -114,10 +114,14 @@ def get_resource_from_pod(provider, profile, uri, accept=None):
 
 def create_clara_container(provider, profile, storage):
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    headers = get_bearer_for_user(provider, profile, clara_container, 'PUT')
+    headers = get_bearer_for_user(provider, profile, clara_container, "PUT")
     container_payload = {
-        "@type": ["http://www.w3.org/ns/ldp#BasicContainer", "http://www.w3.org/ns/ldp#Container", "http://www.w3.org/ns/ldp#Resource"],
-        "@id": clara_container
+        "@type": [
+            "http://www.w3.org/ns/ldp#BasicContainer",
+            "http://www.w3.org/ns/ldp#Container",
+            "http://www.w3.org/ns/ldp#Resource",
+        ],
+        "@id": clara_container,
     }
     type_headers = {"Accept": "application/ld+json", "content-type": "application/ld+json"}
     headers.update(type_headers)
@@ -137,12 +141,12 @@ def lookup_provider_from_profile(profile_url: str):
 
     r = requests.options(profile_url)
     r.raise_for_status()
-    links = r.headers.get('Link')
+    links = r.headers.get("Link")
     if links:
         parsed_links = requests.utils.parse_header_links(links)
         for l in parsed_links:
-            if l.get('rel') == 'http://openid.net/specs/connect/1.0/issuer':
-                return l['url']
+            if l.get("rel") == "http://openid.net/specs/connect/1.0/issuer":
+                return l["url"]
 
     # If we get here, there was no rel in the options. Instead, try and get the card
     # and find its issuer
@@ -178,7 +182,7 @@ def get_title_from_mei(payload, filename):
 def upload_mei_to_pod(provider, profile, storage, payload):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "mei", str(uuid.uuid4()) + ".mei")
     print(f"Uploading file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, resource, "PUT")
     # TODO: Should this be an XML mimetype, or a specific MEI one?
     headers["content-type"] = "application/xml"
     r = requests.put(resource, data=payload.encode("utf-8"), headers=headers)
@@ -191,7 +195,7 @@ def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
     # TODO: This duplicates many other methods, could be simplified
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "webmidi", str(uuid.uuid4()) + ".json")
     print(f"Uploading webmidi file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "application/json"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -202,7 +206,7 @@ def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
 def upload_midi_to_pod(provider, profile, storage, payload: bytes):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "midi", str(uuid.uuid4()) + ".mid")
     print(f"Uploading midi file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/midi"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -212,7 +216,7 @@ def upload_midi_to_pod(provider, profile, storage, payload: bytes):
 
 def upload_mp3_to_pod(provider, profile, resource, payload: bytes):
     print(f"Uploading mp3 file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/mpeg"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -258,32 +262,34 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
 
     segmentation = generate_structural_segmentation(mei_io)
     segmentation_graph = segmentation_to_graph(segmentation, segment_resource)
-    score_graph = score_to_graph(score_resource, segment_resource, performance_resource, mei_external_uri, mei_copy_uri, title)
+    score_graph = score_to_graph(
+        score_resource, segment_resource, performance_resource, mei_external_uri, mei_copy_uri, title
+    )
 
-    segmentation_data = segmentation_graph.serialize(format='n3', encoding='utf-8')
-    score_data = score_graph.serialize(format='n3', encoding='utf-8')
+    segmentation_data = segmentation_graph.serialize(format="n3", encoding="utf-8")
+    score_data = score_graph.serialize(format="n3", encoding="utf-8")
 
     print("Making performance container:", performance_resource)
-    headers = get_bearer_for_user(provider, profile, performance_resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, performance_resource, "PUT")
     r = requests.put(performance_resource, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making timeline container:", timeline_resource)
-    headers = get_bearer_for_user(provider, profile, timeline_resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, timeline_resource, "PUT")
     r = requests.put(timeline_resource, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making score:", score_resource)
-    headers = get_bearer_for_user(provider, profile, score_resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, score_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(score_resource, data=score_data, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making segment:", segment_resource)
-    headers = get_bearer_for_user(provider, profile, segment_resource, 'PUT')
+    headers = get_bearer_for_user(provider, profile, segment_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(segment_resource, data=segmentation_data, headers=headers)
     r.raise_for_status()
@@ -323,20 +329,20 @@ def get_storage_from_profile(profile_uri):
     profile = get_uri_jsonld_or_none(profile_uri)
     if profile is not None:
         expanded = jsonld.expand(profile, jsonld_context)
-        id_card = [l for l in expanded if l.get('@id') == profile_uri]
+        id_card = [l for l in expanded if l.get("@id") == profile_uri]
         if id_card:
             id_card = id_card[0]
-            storage = id_card.get('http://www.w3.org/ns/pim/space#storage', [])
+            storage = id_card.get("http://www.w3.org/ns/pim/space#storage", [])
             if isinstance(storage, list) and storage:
-                return storage[0].get('@id')
+                return storage[0].get("@id")
             elif storage:
-                return storage.get('@id')
+                return storage.get("@id")
     return None
 
 
 def save_performance_manifest(provider, profile, performance_uri, manifest):
     print(f"Uploading manifest to {performance_uri}")
-    headers = get_bearer_for_user(provider, profile, performance_uri, 'PUT')
+    headers = get_bearer_for_user(provider, profile, performance_uri, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(performance_uri, data=manifest, headers=headers)
     r.raise_for_status()
@@ -345,8 +351,8 @@ def save_performance_manifest(provider, profile, performance_uri, manifest):
 
 def save_performance_timeline(provider, profile, timeline_uri, timeline):
     print(f"Uploading timeline to {timeline_uri}")
-    headers = get_bearer_for_user(provider, profile, timeline_uri, 'PUT')
+    headers = get_bearer_for_user(provider, profile, timeline_uri, "PUT")
     headers["content-type"] = "application/ld+json"
-    r = requests.put(timeline_uri, data=json.dumps(timeline).encode('utf-8'), headers=headers)
+    r = requests.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
     r.raise_for_status()
     print("status:", r.text)

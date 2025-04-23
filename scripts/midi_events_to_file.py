@@ -8,6 +8,7 @@ from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)
 
+
 def midi_json_to_midi(midi_notes):
     midiFile = MidiFile()
     midiFile.ticks_per_beat = ticks_per_beat
@@ -67,12 +68,12 @@ def midi_json_to_midi(midi_notes):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('midiJson', help="JSON file containing MIDI event data received from client")
-    parser.add_argument('output', help="Name of output MIDI file to generate")
+    parser.add_argument("midiJson", help="JSON file containing MIDI event data received from client")
+    parser.add_argument("output", help="Name of output MIDI file to generate")
     args = parser.parse_args()
     output = args.output
 
-    with open(args.midiJson, 'r') as fp:
+    with open(args.midiJson, "r") as fp:
         midi_notes = json.load(fp)
 
     midi = midi_json_to_midi(midi_notes)

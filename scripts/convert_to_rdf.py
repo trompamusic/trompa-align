@@ -41,8 +41,9 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
         rdf += """tlUri:{ix} a tl:Instant ;
  tl:onTimeLine <{tlUri}> ;
  {confidence}{velocity}
- tl:at "P{mean_onset}S" ; """.format(ix=ix, mean_onset=obs["obs_mean_onset"], confidence=confidence, velocity=velocity,
-                                     tlUri=tlUri)
+ tl:at "P{mean_onset}S" ; """.format(
+            ix=ix, mean_onset=obs["obs_mean_onset"], confidence=confidence, velocity=velocity, tlUri=tlUri
+        )
         # iterate through each associated MEI identifier
         for ix2, xml_id in enumerate(obs["xml_id"]):
             if ix2 == len(obs["xml_id"]) - 1:
@@ -50,9 +51,10 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
             else:
                 term = ";"
             rdf += """ frbr:embodimentOf {embodiment_id} {term}""".format(
-                embodiment_id=xml_id.replace("trompa-align_", "maps:") if xml_id.startswith(
-                    "trompa-align_inserted_") else "meiUri:" + xml_id,
-                term=term
+                embodiment_id=xml_id.replace("trompa-align_", "maps:")
+                if xml_id.startswith("trompa-align_inserted_")
+                else "meiUri:" + xml_id,
+                term=term,
             )
         # iterate through again to annotate velocities for each performed note
         for ix3, velocity in enumerate(obs["velocity"]):
@@ -64,46 +66,51 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
     oa:hasSource {embodiment_id} .\n""".format(
                 uuid=unique_num,
                 xml_id=obs["xml_id"][ix3],
-                embodiment_id=obs["xml_id"][ix3].replace("trompa-align_", "maps:") if obs["xml_id"][ix3].startswith(
-                    "trompa-align_inserted_") else "meiUri:" + obs["xml_id"][ix3],
+                embodiment_id=obs["xml_id"][ix3].replace("trompa-align_", "maps:")
+                if obs["xml_id"][ix3].startswith("trompa-align_inserted_")
+                else "meiUri:" + obs["xml_id"][ix3],
                 velocity=velocity,
-                tlUri=tlUri
+                tlUri=tlUri,
             )
             unique_num += 1
 
     graph = Graph()
-    graph.parse(data=rdf, format='n3')
+    graph.parse(data=rdf, format="n3")
     if includePerformance:
         # TODO: better way of doing this? Docs say to merge you should parse from text twice:
         #  https://rdflib.readthedocs.io/en/stable/merging.html, but it'd be great to merge nodes
         performance_graph = performance_to_graph(tlUri, scoreUri, audioUri)
-        graph.parse(data=performance_graph.serialize(format='n3'), format='n3')
+        graph.parse(data=performance_graph.serialize(format="n3"), format="n3")
     return graph
 
 
 def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri, performancesUri, worksUri):
     assert False, "Need to update file format to include new parameters to performance_to_graph"
     graphs = []
-    with open(performances_tsv, 'r') as tsvFile:
+    with open(performances_tsv, "r") as tsvFile:
         tsv = csv.DictReader(tsvFile, delimiter="\t")
         for row in tsv:
             # attempt to read MAPS result
-            mapsResultFile = "data/{lastName}-{work}.boe_corresp.txt.maps.json".format(lastName=row['lastName'],
-                                                                                       work=row['Work'])
-            with open(mapsResultFile, 'rb') as f:
+            mapsResultFile = "data/{lastName}-{work}.boe_corresp.txt.maps.json".format(
+                lastName=row["lastName"], work=row["Work"]
+            )
+            with open(mapsResultFile, "rb") as f:
                 try:
                     maps_result_json = f.read()
                 except IOError:
                     print("Warning: Skipping file (could not read): ", fName)
                     continue
-            graphs.append({
-                # generate performance RDF
-                "performance": performance_to_graph(row, tlUri, recordingUri),
-                # generate timeline RDF
-                "timeline": maps_result_to_graph(maps_result_json, segUri, meiUri,
-                                                 tlUri + "/" + row["PerformanceID"], False),
-                "performanceID": row["PerformanceID"]
-            })
+            graphs.append(
+                {
+                    # generate performance RDF
+                    "performance": performance_to_graph(row, tlUri, recordingUri),
+                    # generate timeline RDF
+                    "timeline": maps_result_to_graph(
+                        maps_result_json, segUri, meiUri, tlUri + "/" + row["PerformanceID"], False
+                    ),
+                    "performanceID": row["PerformanceID"],
+                }
+            )
 
     return graphs
 
@@ -133,11 +140,11 @@ def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
             tl:onTimeLine <{timeline_uri}> 
         ] .
     """
-    return Graph().parse(data=rdf, format='n3')
+    return Graph().parse(data=rdf, format="n3")
 
 
 def graph_to_jsonld(g, mei_uri=None, tl_uri=None):
-    graph = json.loads(g.serialize(format='json-ld'))
+    graph = json.loads(g.serialize(format="json-ld"))
     context = {
         "mo": "http://purl.org/ontology/mo/",
         "dcterms": "http://purl.org/dc/terms/",
@@ -164,7 +171,7 @@ def graph_to_jsonld(g, mei_uri=None, tl_uri=None):
 
 
 def graph_to_turtle(g):
-    return g.serialize(format='n3', encoding='utf-8')
+    return g.serialize(format="n3", encoding="utf-8")
 
 
 def generate_structural_segmentation(meiFile):
@@ -173,21 +180,19 @@ def generate_structural_segmentation(meiFile):
     last_note_per_section = {}
     tree = ET.parse(meiFile)
     root = tree.getroot()
-    ns = {'mei': 'http://www.music-encoding.org/ns/mei', 'xml': 'http://www.w3.org/XML/1998/namespace'}
-    notes = root.findall('.//mei:note', ns)
-    noteIds = [note.get('{http://www.w3.org/XML/1998/namespace}id') for note in notes]
-    parentMeasureIterators = [note.iterancestors(tag='{http://www.music-encoding.org/ns/mei}measure') for note in notes]
-    parentSectionIterators = [note.iterancestors(tag='{http://www.music-encoding.org/ns/mei}section') for note in notes]
+    ns = {"mei": "http://www.music-encoding.org/ns/mei", "xml": "http://www.w3.org/XML/1998/namespace"}
+    notes = root.findall(".//mei:note", ns)
+    noteIds = [note.get("{http://www.w3.org/XML/1998/namespace}id") for note in notes]
+    parentMeasureIterators = [note.iterancestors(tag="{http://www.music-encoding.org/ns/mei}measure") for note in notes]
+    parentSectionIterators = [note.iterancestors(tag="{http://www.music-encoding.org/ns/mei}section") for note in notes]
     for ix, note in enumerate(noteIds):
-        noteMeasure = [measure.get('{http://www.w3.org/XML/1998/namespace}id') for measure in
-                       parentMeasureIterators[ix]]
-        noteSections = [section.get('{http://www.w3.org/XML/1998/namespace}id') for section in
-                        parentSectionIterators[ix]]
-        seg_data.append({
-            "noteId": note,
-            "measure": noteMeasure,
-            "section": noteSections
-        })
+        noteMeasure = [
+            measure.get("{http://www.w3.org/XML/1998/namespace}id") for measure in parentMeasureIterators[ix]
+        ]
+        noteSections = [
+            section.get("{http://www.w3.org/XML/1998/namespace}id") for section in parentSectionIterators[ix]
+        ]
+        seg_data.append({"noteId": note, "measure": noteMeasure, "section": noteSections})
     i = 0
     for obj in seg_data:
         if obj["section"][0] not in first_note_per_section:
@@ -202,10 +207,12 @@ def generate_structural_segmentation(meiFile):
         first_note_per_section[n]["last"] = last_note_per_section[n]["last"]
         # identify the note IDs for all objects in section n
         first_note_per_section[n]["notes"] = set(
-            list(map(lambda x: x["noteId"], filter(lambda y: n in y["section"], seg_data))))
+            list(map(lambda x: x["noteId"], filter(lambda y: n in y["section"], seg_data)))
+        )
         # identify the measures for all objects in section n
         first_note_per_section[n]["measures"] = set(
-            list(map(lambda x: x["measure"][0], filter(lambda y: n in y["section"], seg_data))))
+            list(map(lambda x: x["measure"][0], filter(lambda y: n in y["section"], seg_data)))
+        )
     return first_note_per_section
 
 
@@ -229,6 +236,7 @@ def score_to_graph(score_uri, seg_uri, performance_resource, mei_uri, mei_copy_u
     graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
     graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_uri)))
     return graph
+
 
 def segmentation_to_graph(seg_data, segUri):
     rdf = """@prefix mo: <http://purl.org/ontology/mo/> .
@@ -267,37 +275,50 @@ def segmentation_to_graph(seg_data, segUri):
             measures="".join(["<" + segUri + "#" + n + ">, " for n in seg_data[seg]["measures"]]).rpartition(", ")[0],
             endterm=".",
             before="",
-            after="")
+            after="",
+        )
     return Graph().parse(data=rdf, format="n3")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--maps', '-m', help="Path to MAPS result file", required=False)
-    parser.add_argument('--segmentlineUri', '-s', help="Score segmentline URI", required=False)
-    parser.add_argument('--timelineUri', '-t', help="Performance timeline URI", required=False)
-    parser.add_argument('--format', '-f', help="Output format type (ttl, jsonld, both)", required=True)
-    parser.add_argument('--timelineOutput', '-o',
-                        help="Performance timeline output file name (will be suffixed with .ttl or .jsonld",
-                        required=False)
-    parser.add_argument('--meiFile', '-e', help="If provided, generate a structural segmentation for the MEI file",
-                        required=False)
-    parser.add_argument('--meiUri', '-u', help="MEI file URI", required=False)
-    parser.add_argument('--segmentlineOutput', '-p', help="Structural segmentation output", required=False)
-    parser.add_argument('--solidContainer', '-c',
-                        help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.",
-                        required=False)
-    parser.add_argument('--performancesFile', '-P', help="Performance metadata TSV file", required=False)
-    parser.add_argument('--performancesUri', '-q', help="Prefix URI for generated performances RDF", required=False)
-    parser.add_argument('--recordingUri', '-r', help="URI of recorded media directory for these performances",
-                        required=False)
-    parser.add_argument('--worksUri', '-w', help="Prefix URI for works", required=False)
-    parser.add_argument('--includePerformance', '-i',
-                        help="Flag to determine whether performance info should be written alongside timeline output",
-                        action="store_true")
-    parser.add_argument('--scoreUri', '-z', help="Score definition URI; required if includePerforance is true",
-                        required=False)
-    parser.add_argument('--audioUri', '-a', help="Audio URI; required if includePerforance is true", required=False)
+    parser.add_argument("--maps", "-m", help="Path to MAPS result file", required=False)
+    parser.add_argument("--segmentlineUri", "-s", help="Score segmentline URI", required=False)
+    parser.add_argument("--timelineUri", "-t", help="Performance timeline URI", required=False)
+    parser.add_argument("--format", "-f", help="Output format type (ttl, jsonld, both)", required=True)
+    parser.add_argument(
+        "--timelineOutput",
+        "-o",
+        help="Performance timeline output file name (will be suffixed with .ttl or .jsonld",
+        required=False,
+    )
+    parser.add_argument(
+        "--meiFile", "-e", help="If provided, generate a structural segmentation for the MEI file", required=False
+    )
+    parser.add_argument("--meiUri", "-u", help="MEI file URI", required=False)
+    parser.add_argument("--segmentlineOutput", "-p", help="Structural segmentation output", required=False)
+    parser.add_argument(
+        "--solidContainer",
+        "-c",
+        help="Root URI of CLARA folder in user's Solid POD. Replaces --performancesUri and --timelineUri.",
+        required=False,
+    )
+    parser.add_argument("--performancesFile", "-P", help="Performance metadata TSV file", required=False)
+    parser.add_argument("--performancesUri", "-q", help="Prefix URI for generated performances RDF", required=False)
+    parser.add_argument(
+        "--recordingUri", "-r", help="URI of recorded media directory for these performances", required=False
+    )
+    parser.add_argument("--worksUri", "-w", help="Prefix URI for works", required=False)
+    parser.add_argument(
+        "--includePerformance",
+        "-i",
+        help="Flag to determine whether performance info should be written alongside timeline output",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--scoreUri", "-z", help="Score definition URI; required if includePerforance is true", required=False
+    )
+    parser.add_argument("--audioUri", "-a", help="Audio URI; required if includePerforance is true", required=False)
 
     args = parser.parse_args()
 
@@ -331,14 +352,23 @@ if __name__ == "__main__":
         recordingUri = os.path.join(solidContainer, "recording/")
 
     if performancesFile is not None:
-        if segUri is None or meiUri is None or tlUri is None or recordingUri is None or performancesUri is None or worksUri is None:
+        if (
+            segUri is None
+            or meiUri is None
+            or tlUri is None
+            or recordingUri is None
+            or performancesUri is None
+            or worksUri is None
+        ):
             sys.exit(
-                "You must provide each of --segmentlineUri, --meiUri, --timelineUri, --performancesUri, --recordingUri, and --worksUri when a performances metadata TSV file is specified")
+                "You must provide each of --segmentlineUri, --meiUri, --timelineUri, --performancesUri, --recordingUri, and --worksUri when a performances metadata TSV file is specified"
+            )
         # performance TSV file specified, generate performance graph for each row
-        performances = performances_to_graphs(performancesFile, segUri, meiUri, tlUri, recordingUri, performancesUri,
-                                              worksUri)
+        performances = performances_to_graphs(
+            performancesFile, segUri, meiUri, tlUri, recordingUri, performancesUri, worksUri
+        )
         for perf in performances:
-            if outputFormat == 'ttl' or outputFormat == 'both':
+            if outputFormat == "ttl" or outputFormat == "both":
                 perfTtl = graph_to_turtle(perf["performance"])
                 with open("performance/" + perf["performanceID"] + ".ttl", "w") as ttl_file:
                     ttl_file.write(perfTtl)
@@ -348,8 +378,8 @@ if __name__ == "__main__":
                     ttl_file.write(tlTtl)
                     print("Performance description (turtle) written: timeline/" + perf["performanceID"] + ".ttl")
 
-            if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
-                extension = '.jsonld'
+            if outputFormat == "json" or outputFormat == "jsonld" or outputFormat == "both":
+                extension = ".jsonld"
                 perfJsonld = json.dumps(graph_to_jsonld(perf["performance"], extension), indent=2)
                 with open("performance/" + perf["performanceID"] + extension, "w") as json_file:
                     json_file.write(perfJsonld)
@@ -363,23 +393,25 @@ if __name__ == "__main__":
         # maps result file specified...
         if segUri is None or tlUri is None or meiUri is None or outputFName is None:
             sys.exit(
-                "You must provide each of --segmentlineUri, --meiUri, --timelineUri, and --timelineOutput when a MAPS result file is specified")
+                "You must provide each of --segmentlineUri, --meiUri, --timelineUri, and --timelineOutput when a MAPS result file is specified"
+            )
         if os.path.exists(fName):
-            with open(fName, 'rb') as f:
+            with open(fName, "rb") as f:
                 try:
                     maps_result_json = f.read()
                 except IOError:
                     print("Could not read file: ", fName)
                     sys.exit()
-                g = maps_result_to_graph(maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri,
-                                         includePerformance)
-                if outputFormat == 'ttl' or outputFormat == 'both':
+                g = maps_result_to_graph(
+                    maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance
+                )
+                if outputFormat == "ttl" or outputFormat == "both":
                     ttl = graph_to_turtle(g)
                     with open(outputFName + ".ttl", "w") as ttl_file:
                         ttl_file.write(ttl.decode("utf-8"))
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
-                if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
-                    extension = '.jsonld'
+                if outputFormat == "json" or outputFormat == "jsonld" or outputFormat == "both":
+                    extension = ".jsonld"
                     jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
                     with open(outputFName + extension, "w") as json_file:
                         json_file.write(jsonld)
@@ -390,15 +422,16 @@ if __name__ == "__main__":
         # mei file specified, generate structural segmentation for it
         if segmentlineOutput is None or segUri is None or meiUri is None:
             sys.exit(
-                "You must provide --segmentlineOutput, --segmentlineUri, and --meiUri when a MEI file is specified")
+                "You must provide --segmentlineOutput, --segmentlineUri, and --meiUri when a MEI file is specified"
+            )
         seg_data = generate_structural_segmentation(meiFile)
         g = segmentation_to_graph(seg_data, segUri, meiUri)
-        if outputFormat == 'ttl' or outputFormat == 'both':
+        if outputFormat == "ttl" or outputFormat == "both":
             ttl = graph_to_turtle(g)
             with open(segmentlineOutput + ".ttl", "w") as ttl_file:
                 ttl_file.write(ttl)
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
-        if outputFormat == 'json' or outputFormat == 'jsonld' or outputFormat == 'both':
+        if outputFormat == "json" or outputFormat == "jsonld" or outputFormat == "both":
             jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
             with open(segmentlineOutput + extension, "w") as json_file:
                 json_file.write(jsonld)
