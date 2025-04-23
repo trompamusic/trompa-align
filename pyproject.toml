@@ -1,0 +1,44 @@
+[project]
+name = "trompa-align"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "celery==5.2.7",
+    "click~=8.1.0",
+    "flask~=3.1.0",
+    "flask-cors==3.0.10",
+    "flask-redis~=0.4.0",
+    "flask-shell-ipython~=0.5.3",
+    "flask-sqlalchemy~=3.1.1",
+    "fluent-logger~=0.10.0",
+    "ipython~=8.35.0",
+    "jinja2~=3.1.2",
+    "jwcrypto~=1.5.6",
+    "lxml~=4.9.2",
+    "midi2audio~=0.1.1",
+    "mido~=1.2.10",
+    "oic~=1.7.0",
+    "psycopg2-binary~=2.9.10",
+    "pydub~=0.25.1",
+    "pyld~=2.0.3",
+    "python-dotenv~=1.1.0",
+    "rdflib~=6.2.0",
+    "redis~=5.2.1",
+    "requests~=2.32.0",
+    "sentry-sdk[flask]~=1.16.0",
+    "solid-oidc-app-permission",
+    "sqlalchemy~=2.0.1",
+    "verovio~=3.14.0",
+]
+
+[tool.uv.sources]
+solid-oidc-app-permission = { git = "https://github.com/trompamusic/solid-oidc-app-permission.git", rev = "36e7fe8" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+ignore = ["E741"]

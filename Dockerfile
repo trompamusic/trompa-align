@@ -1,5 +1,11 @@
 FROM python:3.11
 
+ENV UV_LINK_MODE=copy \
+  UV_COMPILE_BYTECODE=1 \
+  UV_PYTHON_DOWNLOADS=never
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 #install dependencies (R, python, wget, unzip)
 RUN apt-get update \
     && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm \
@@ -25,7 +31,7 @@ WORKDIR /code
 COPY ./install-packages.R /code
 RUN Rscript /code/install-packages.R
 
-COPY requirements.txt /code
-RUN --mount=type=cache,target=/root/.cache pip install -r requirements.txt
+COPY pyproject.toml uv.lock /code/
+RUN --mount=type=cache,target=/home/app/.cache/uv uv sync --frozen
 
 COPY . /code
