@@ -110,7 +110,7 @@ def check_user_perms():
 
     provider = lookup_provider_from_profile(profile_url)
     configuration = extensions.backend.backend.get_configuration_token(issuer=provider, profile=profile_url)
-    has_permission = configuration is not None and bool(configuration.data)
+    has_permission = configuration is not None and bool(configuration.data) and "refresh_token" in configuration.data
 
     return jsonify({"has_permission": has_permission})
 
