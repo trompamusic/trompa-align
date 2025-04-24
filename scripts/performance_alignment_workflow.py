@@ -1,16 +1,13 @@
 import json
 import os
-import requests
 import subprocess
-import sys
-import csv
-import io
-from pathlib import Path
 
+import requests
+
+from . import verovio_midi
 from .convert_to_rdf import maps_result_to_graph, performance_to_graph
 from .mei_to_midi import mei_to_midi
 from .midi_to_mp3 import midi_to_mp3
-from . import verovio_midi
 from .smat_align import smat_align
 from .trompa_align import generate_maps_result_json
 

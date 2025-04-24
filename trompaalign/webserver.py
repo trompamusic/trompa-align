@@ -1,23 +1,23 @@
 import os
+
 import flask
+import sentry_sdk
 from celery import Celery, Task
 from celery.result import AsyncResult
-import sentry_sdk
-from flask import request, jsonify
-from sentry_sdk.integrations.flask import FlaskIntegration
+from flask import jsonify, request
 from sentry_sdk.integrations.celery import CeleryIntegration
-from trompasolid.authentication import generate_authentication_url, NoProviderError, authentication_callback
+from sentry_sdk.integrations.flask import FlaskIntegration
+from trompasolid import client
+from trompasolid.authentication import NoProviderError, authentication_callback, generate_authentication_url
 from trompasolid.backend.db_backend import DBBackend
 
 from trompaalign import extensions, tasks
-from trompasolid import client
-
 from trompaalign.solid import (
     SolidError,
-    lookup_provider_from_profile,
-    upload_webmidi_to_pod,
-    upload_midi_to_pod,
     get_storage_from_profile,
+    lookup_provider_from_profile,
+    upload_midi_to_pod,
+    upload_webmidi_to_pod,
 )
 
 
