@@ -93,9 +93,10 @@ def auth_callback():
     provider = flask.session["provider"]
 
     redirect_uri = flask.current_app.config["REDIRECT_URL"]
+    base_url = flask.current_app.config["BASE_URL"]
     always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
     success, data = authentication_callback(
-        extensions.backend.backend, auth_code, state, provider, redirect_uri, always_use_client_url
+        extensions.backend.backend, auth_code, state, provider, redirect_uri, base_url, always_use_client_url
     )
 
     return jsonify({"status": success, "data": data})
