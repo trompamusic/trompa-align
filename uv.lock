@@ -972,30 +972,31 @@ wheels = [
 
 [[package]]
 name = "sentry-sdk"
-version = "1.16.0"
+version = "2.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/37/24df9417889d23334c4646c2015c602f5194101426d6381ebd2453940e7c/sentry-sdk-1.16.0.tar.gz", hash = "sha256:a900845bd78c263d49695d48ce78a4bce1030bbd917e0b6cc021fc000c901113", size = 143348, upload_time = "2023-02-27T10:59:06.115Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/b6/a92ae6fa6d7e6e536bc586776b1669b84fb724dfe21b8ff08297f2d7c969/sentry_sdk-2.27.0.tar.gz", hash = "sha256:90f4f883f9eff294aff59af3d58c2d1b64e3927b28d5ada2b9b41f5aeda47daf", size = 323556, upload_time = "2025-04-24T10:09:37.927Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/03/4a3e03619eb41b4d9028d377869cc29a5a2095975ca9e8d9b64cb87e1450/sentry_sdk-1.16.0-py2.py3-none-any.whl", hash = "sha256:633edefead34d976ff22e7edc367cdf57768e24bc714615ccae746d9d91795ae", size = 184311, upload_time = "2023-02-27T10:59:06.15Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/8b/fb496a45854e37930b57564a20fb8e90dd0f8b6add0491527c00f2163b00/sentry_sdk-2.27.0-py2.py3-none-any.whl", hash = "sha256:c58935bfff8af6a0856d37e8adebdbc7b3281c2b632ec823ef03cd108d216ff0", size = 340786, upload_time = "2025-04-24T10:09:35.897Z" },
 ]
 
 [package.optional-dependencies]
 flask = [
     { name = "blinker" },
     { name = "flask" },
+    { name = "markupsafe" },
 ]
 
 [[package]]
 name = "setuptools"
-version = "79.0.0"
+version = "79.0.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7d/19/fecb7e2825616270f34512b3394cdcf6f45a79b5b6d94fdbd86a509e67b5/setuptools-79.0.0.tar.gz", hash = "sha256:9828422e7541213b0aacb6e10bbf9dd8febeaa45a48570e09b6d100e063fc9f9", size = 1367685, upload_time = "2025-04-20T15:47:56.706Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/71/b6365e6325b3290e14957b2c3a804a529968c77a049b2ed40c095f749707/setuptools-79.0.1.tar.gz", hash = "sha256:128ce7b8f33c3079fd1b067ecbb4051a66e8526e7b65f6cec075dfc650ddfa88", size = 1367909, upload_time = "2025-04-23T22:20:59.241Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/ea/d53f2f8897c46a36df085964d07761ea4c2d1f2cf92019693b6742b7aabb/setuptools-79.0.0-py3-none-any.whl", hash = "sha256:b9ab3a104bedb292323f53797b00864e10e434a3ab3906813a7169e4745b912a", size = 1256065, upload_time = "2025-04-20T15:47:54.242Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/6d/b4752b044bf94cb802d88a888dc7d288baaf77d7910b7dedda74b5ceea0c/setuptools-79.0.1-py3-none-any.whl", hash = "sha256:e147c0549f27767ba362f9da434eab9c5dc0045d5304feb602a0af001089fc51", size = 1256281, upload_time = "2025-04-23T22:20:56.768Z" },
 ]
 
 [[package]]
@@ -1136,7 +1137,7 @@ requires-dist = [
     { name = "rdflib", specifier = "~=6.2.0" },
     { name = "redis", specifier = "~=5.2.1" },
     { name = "requests", specifier = "~=2.32.0" },
-    { name = "sentry-sdk", extras = ["flask"], specifier = "~=1.16.0" },
+    { name = "sentry-sdk", extras = ["flask"], specifier = "~=2.27.0" },
     { name = "solid-oidc-app-permission", git = "https://github.com/trompamusic/solid-oidc-app-permission.git?rev=b310c1af5e7bb9d4637322086ef54ffa939abdef" },
     { name = "sqlalchemy", specifier = "~=2.0.1" },
     { name = "verovio", specifier = "~=3.14.0" },

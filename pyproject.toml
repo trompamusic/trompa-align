@@ -27,7 +27,7 @@ dependencies = [
     "rdflib~=6.2.0",
     "redis~=5.2.1",
     "requests~=2.32.0",
-    "sentry-sdk[flask]~=1.16.0",
+    "sentry-sdk[flask]~=2.27.0",
     "solid-oidc-app-permission",
     "sqlalchemy~=2.0.1",
     "verovio~=3.14.0",
