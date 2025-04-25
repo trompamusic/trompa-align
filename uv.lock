@@ -1011,7 +1011,7 @@ wheels = [
 [[package]]
 name = "solid-oidc-app-permission"
 version = "0.1.0"
-source = { git = "https://github.com/trompamusic/solid-oidc-app-permission.git?rev=b310c1af5e7bb9d4637322086ef54ffa939abdef#b310c1af5e7bb9d4637322086ef54ffa939abdef" }
+source = { git = "https://github.com/trompamusic/solid-oidc-app-permission.git?rev=d38f7664e5e2c4f4dd804af9338c4fd9b6e60bfb#d38f7664e5e2c4f4dd804af9338c4fd9b6e60bfb" }
 dependencies = [
     { name = "click" },
     { name = "flask" },
@@ -1138,7 +1138,7 @@ requires-dist = [
     { name = "redis", specifier = "~=5.2.1" },
     { name = "requests", specifier = "~=2.32.0" },
     { name = "sentry-sdk", extras = ["flask"], specifier = "~=2.27.0" },
-    { name = "solid-oidc-app-permission", git = "https://github.com/trompamusic/solid-oidc-app-permission.git?rev=b310c1af5e7bb9d4637322086ef54ffa939abdef" },
+    { name = "solid-oidc-app-permission", git = "https://github.com/trompamusic/solid-oidc-app-permission.git?rev=d38f7664e5e2c4f4dd804af9338c4fd9b6e60bfb" },
     { name = "sqlalchemy", specifier = "~=2.0.1" },
     { name = "verovio", specifier = "~=3.14.0" },
 ]
