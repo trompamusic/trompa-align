@@ -129,6 +129,7 @@ def add_score_status():
             return jsonify({"status": "error", "error": str(result.result)})
         else:
             # An unknown failure mode
+            sentry_sdk.capture_exception(result.result)
             return jsonify({"status": "unknown", "error": str(result.result)})
     else:
         if result.ready():
