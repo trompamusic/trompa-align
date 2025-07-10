@@ -17,6 +17,7 @@ services:
     volumes:
       - "./.root-home:/root"
       - ".:/code"
+      - "/code/.venv"
 
   redis:
     image: "redis:alpine"

@@ -1,9 +1,9 @@
 from flask_cors import CORS
 from flask_redis import FlaskRedis
 from flask_sqlalchemy import SQLAlchemy
-from trompasolid.backend import SolidBackend
-from trompasolid.backend.db_backend import DBBackend
-from trompasolid.backend.redis_backend import RedisBackend
+from solidauth.backend import SolidBackend
+from solidauth.backend.db_backend import DBBackend
+from solidauth.backend.redis_backend import RedisBackend
 
 
 class BackendExtension:

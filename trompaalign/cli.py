@@ -2,27 +2,28 @@ import json
 import os
 
 import click
-from flask.cli import AppGroup
 import requests
 import requests.utils
-from trompasolid.client import get_bearer_for_user
+from flask import current_app
+from flask.cli import AppGroup
+from solidauth import client
 
 from trompaalign.solid import (
-    get_storage_from_profile,
-    lookup_provider_from_profile,
-    get_pod_listing,
     CLARA_CONTAINER_NAME,
-    create_clara_container,
-    upload_mei_to_pod,
     create_and_save_structure,
-    get_title_from_mei,
-    upload_webmidi_to_pod,
-    get_contents_of_container,
+    create_clara_container,
     find_score_for_external_uri,
-    upload_midi_to_pod,
+    get_contents_of_container,
+    get_pod_listing,
     get_pod_listing_ttl,
-    patch_container_item_title,
+    get_storage_from_profile,
+    get_title_from_mei,
     http_options,
+    lookup_provider_from_profile,
+    patch_container_item_title,
+    upload_mei_to_pod,
+    upload_midi_to_pod,
+    upload_webmidi_to_pod,
 )
 from trompaalign.tasks import align_recording
 
@@ -31,9 +32,11 @@ cli = AppGroup("solid", help="Solid commands")
 
 @cli.command("list-pod")
 @click.argument("profile")
-def cmd_list_containers_in_pod(profile):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_list_containers_in_pod(profile, use_client_id_document):
     """List containers in a pod."""
     print(f"Looking up data for profile {profile}")
+    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -46,7 +49,7 @@ def cmd_list_containers_in_pod(profile):
     print(f"Storage: {storage}")
     print("Pod containers:")
     print(f"{provider=} {profile=}")
-    listing = get_pod_listing(provider, profile, storage)
+    listing = get_pod_listing(cl, provider, profile, storage)
     for item in listing["@graph"]:
         if "ldp:BasicContainer" in item.get("@type", []):
             print(" ", item.get("@id"))
@@ -56,6 +59,7 @@ def cmd_list_containers_in_pod(profile):
 @click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("container")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_list_container(use_json, profile, container):
     """Get the contents of a container"""
     print(f"Looking up data for profile {profile}")
@@ -85,6 +89,7 @@ def cmd_list_container(use_json, profile, container):
 
 @cli.command("list-clara")
 @click.argument("profile")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_check_pod_for_clara(profile):
     """List clara content in a pod.
 
@@ -118,6 +123,7 @@ def cmd_check_pod_for_clara(profile):
 
 @cli.command("create-clara")
 @click.argument("profile")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_add_clara_to_pod(profile):
     """Create the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
@@ -137,7 +143,8 @@ def cmd_add_clara_to_pod(profile):
 @click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("resource")
-def cmd_get_resource(use_json, profile, resource):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_get_resource(use_json, profile, resource, use_client_id_document):
     """Get a resource, authenticating as a specific user"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -145,7 +152,8 @@ def cmd_get_resource(use_json, profile, resource):
         print("Cannot find provider, quitting")
         return
 
-    headers = get_bearer_for_user(provider, profile, resource, "GET")
+    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     if use_json:
         type_headers = {"Accept": "application/ld+json"}
     else:
@@ -164,6 +172,7 @@ def cmd_get_resource(use_json, profile, resource):
 @click.argument("container")
 @click.argument("item")
 @click.argument("title")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_patch_container_title(profile, container, item, title):
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -177,6 +186,7 @@ def cmd_patch_container_title(profile, container, item, title):
 @cli.command("get-score-for-url")
 @click.argument("profile")
 @click.argument("score_url")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_get_score_for_url(profile, score_url):
     """Find the score container for a given score external URL"""
     print(f"Looking up data for profile {profile}")
@@ -194,7 +204,7 @@ def cmd_get_score_for_url(profile, score_url):
         print(f"External MEI URL is in this user's solid pod as {score}")
 
 
-def recursive_delete_from_pod(provider, profile, container):
+def recursive_delete_from_pod(solid_client, provider, profile, container):
     """
     A container listing has 2 types of data returned from a query:
      - the information about the container itself (has an ldp:contains section with
@@ -216,17 +226,18 @@ def recursive_delete_from_pod(provider, profile, container):
             recursive_delete_from_pod(provider, profile, item["@id"])
         else:
             # Otherwise it's just a file, delete it.
-            headers = get_bearer_for_user(provider, profile, item_id, "DELETE")
+            headers = solid_client.get_bearer_for_user(provider, profile, item_id, "DELETE")
             print(f"Delete file {item_id}")
             requests.delete(item_id, headers=headers)
     # Finally, delete the container itself
-    headers = get_bearer_for_user(provider, profile, container, "DELETE")
+    headers = solid_client.get_bearer_for_user(provider, profile, container, "DELETE")
     requests.delete(container, headers=headers)
 
 
 @cli.command("delete-clara")
 @click.argument("profile")
 @click.option("-c", "--container")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_delete_clara_container_from_pod(profile, container):
     """Delete the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
@@ -255,7 +266,8 @@ def cmd_delete_clara_container_from_pod(profile, container):
 @cli.command("delete")
 @click.argument("profile")
 @click.argument("resource")
-def cmd_delete_resource(profile, resource):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_delete_resource(profile, resource, use_client_id_document):
     """Delete an item from a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -263,7 +275,8 @@ def cmd_delete_resource(profile, resource):
         print("Cannot find provider, quitting")
         return
 
-    headers = get_bearer_for_user(provider, profile, resource, "DELETE")
+    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    headers = cl.get_bearer_for_user(provider, profile, resource, "DELETE")
     requests.delete(resource, headers=headers)
 
 
@@ -272,6 +285,7 @@ def cmd_delete_resource(profile, resource):
 @click.option("--url", default=None)
 @click.option("--file", default=None)
 @click.option("--title", default=None)
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_upload_score_to_pod(profile, url, file, title):
     """Upload an MEI score to a pod"""
     print(f"Looking up data for profile {profile}")
@@ -312,6 +326,7 @@ def cmd_upload_score_to_pod(profile, url, file, title):
 @cli.command("upload-webmidi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_upload_webmidi_to_pod(profile, file):
     """Upload a webmidi performance to a pod, convert to midi, and upload the midi"""
     provider = lookup_provider_from_profile(profile)
@@ -332,6 +347,7 @@ def cmd_upload_webmidi_to_pod(profile, file):
 @cli.command("upload-midi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_upload_midi_to_pod(profile, file):
     """Upload a midi performance to a pod"""
     provider = lookup_provider_from_profile(profile)
@@ -353,7 +369,8 @@ def cmd_upload_midi_to_pod(profile, file):
 @click.argument("profile")
 @click.argument("resource")
 @click.argument("file", type=click.Path(exists=True))
-def add_turtle(profile, resource, file):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def add_turtle(profile, resource, file, use_client_id_document):
     """Upload any file to a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -366,7 +383,8 @@ def add_turtle(profile, resource, file):
 
     payload = open(file, "rb").read()
     print(f"Uploading file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "PUT")
+    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(resource, data=payload, headers=headers)
     print(r.text)
@@ -375,7 +393,8 @@ def add_turtle(profile, resource, file):
 @cli.command("get-turtle")
 @click.argument("profile")
 @click.argument("resource")
-def get_turtle(profile, resource):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def get_turtle(profile, resource, use_client_id_document):
     """Get any file from a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -387,7 +406,8 @@ def get_turtle(profile, resource):
         return
 
     print(f"Getting file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "GET")
+    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     r = requests.get(resource, headers=headers)
     print(r.text)
 

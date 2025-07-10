@@ -1,19 +1,21 @@
 import io
 import json
+import logging
 import os
 import uuid
 from urllib.error import HTTPError
 
 import rdflib
-from rdflib import URIRef
 import requests
 import requests.utils
 from pyld import jsonld
-from trompasolid.client import get_bearer_for_user
+from rdflib import URIRef
 
-from scripts.convert_to_rdf import generate_structural_segmentation, segmentation_to_graph, score_to_graph
+from scripts.convert_to_rdf import generate_structural_segmentation, score_to_graph, segmentation_to_graph
 from scripts.namespace import MO
 from trompaalign.mei import get_metadata_for_mei
+
+logger = logging.getLogger(__name__)
 
 
 class SolidError(Exception):
@@ -34,29 +36,29 @@ jsonld_context = {
 CLARA_CONTAINER_NAME = "at.ac.mdw.trompa/"
 
 
-def http_options(provider, profile, container):
-    headers = get_bearer_for_user(provider, profile, container, "OPTIONS")
+def http_options(solid_client, provider, profile, container):
+    headers = solid_client.get_bearer_for_user(provider, profile, container, "OPTIONS")
     r = requests.options(container, headers=headers)
     r.raise_for_status()
     return r.headers, r.content
 
 
-def get_pod_listing(provider, profile, storage):
-    headers = get_bearer_for_user(provider, profile, storage, "GET")
-    resp = get_uri_jsonld(storage, headers)
-    if resp is not None:
-        compact = jsonld.compact(resp, jsonld_context)
+def get_pod_listing(solid_client, provider, profile, storage):
+    headers = solid_client.get_bearer_for_user(provider, profile, storage, "GET")
+    data, headers = get_uri_jsonld(storage, headers)
+    if data is not None:
+        compact = jsonld.compact(data, jsonld_context)
         return compact
     else:
         return None
 
 
-def get_pod_listing_ttl(provider, profile, storage):
-    headers = get_bearer_for_user(provider, profile, storage, "GET")
+def get_pod_listing_ttl(solid_client, provider, profile, storage):
+    headers = solid_client.get_bearer_for_user(provider, profile, storage, "GET")
     return get_uri_ttl(storage, headers)
 
 
-def patch_container_item_title(provider, profile, container, item, title):
+def patch_container_item_title(solid_client, provider, profile, container, item, title):
     """
     TODO: Trying to follow the sparkql-update syntax at https://www.w3.org/TR/2013/REC-sparql11-update-20130321/#insertData
      to add another triple to a container.
@@ -72,12 +74,12 @@ def patch_container_item_title(provider, profile, container, item, title):
     data related to the container other than the filesystem data (date created, etc)
     """
 
-    headers = get_bearer_for_user(provider, profile, container, "PATCH")
+    headers = solid_client.get_bearer_for_user(provider, profile, container, "PATCH")
     type_headers = {"Accept": "text/turtle", "content-type": "application/sparql-update"}
     headers.update(type_headers)
 
     update_data = f"""INSERT DATA
-{{ 
+{{
   <{item}> <http://purl.org/dc/terms/title> "{title}" .
 }}"""
 
@@ -103,8 +105,8 @@ def get_contents_of_container(container, container_name):
     return contents
 
 
-def get_resource_from_pod(provider, profile, uri, accept=None):
-    headers = get_bearer_for_user(provider, profile, uri, "GET")
+def get_resource_from_pod(solid_client, provider, profile, uri, accept=None):
+    headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
     if accept:
         headers.update({"Accept": accept})
     r = requests.get(uri, headers=headers)
@@ -112,9 +114,9 @@ def get_resource_from_pod(provider, profile, uri, accept=None):
     return r.content
 
 
-def create_clara_container(provider, profile, storage):
+def create_clara_container(solid_client, provider, profile, storage):
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    headers = get_bearer_for_user(provider, profile, clara_container, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, clara_container, "PUT")
     container_payload = {
         "@type": [
             "http://www.w3.org/ns/ldp#BasicContainer",
@@ -179,10 +181,10 @@ def get_title_from_mei(payload, filename):
         return filename
 
 
-def upload_mei_to_pod(provider, profile, storage, payload):
+def upload_mei_to_pod(solid_client, provider, profile, storage, payload):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "mei", str(uuid.uuid4()) + ".mei")
     print(f"Uploading file {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     # TODO: Should this be an XML mimetype, or a specific MEI one?
     headers["content-type"] = "application/xml"
     r = requests.put(resource, data=payload.encode("utf-8"), headers=headers)
@@ -191,11 +193,11 @@ def upload_mei_to_pod(provider, profile, storage, payload):
     return resource
 
 
-def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
+def upload_webmidi_to_pod(solid_client, provider, profile, storage, payload: bytes):
     # TODO: This duplicates many other methods, could be simplified
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "webmidi", str(uuid.uuid4()) + ".json")
     print(f"Uploading webmidi file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "application/json"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -203,10 +205,10 @@ def upload_webmidi_to_pod(provider, profile, storage, payload: bytes):
     return resource
 
 
-def upload_midi_to_pod(provider, profile, storage, payload: bytes):
+def upload_midi_to_pod(solid_client, provider, profile, storage, payload: bytes):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "midi", str(uuid.uuid4()) + ".mid")
     print(f"Uploading midi file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/midi"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -214,9 +216,9 @@ def upload_midi_to_pod(provider, profile, storage, payload: bytes):
     return resource
 
 
-def upload_mp3_to_pod(provider, profile, resource, payload: bytes):
+def upload_mp3_to_pod(solid_client, provider, profile, resource, payload: bytes):
     print(f"Uploading mp3 file to {resource}")
-    headers = get_bearer_for_user(provider, profile, resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/mpeg"
     r = requests.put(resource, data=payload, headers=headers)
     r.raise_for_status()
@@ -224,12 +226,12 @@ def upload_mp3_to_pod(provider, profile, resource, payload: bytes):
     return resource
 
 
-def find_score_for_external_uri(provider, profile, storage, mei_external_uri):
+def find_score_for_external_uri(solid_client, provider, profile, storage, mei_external_uri):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
-    score_listing = get_pod_listing(provider, profile, resource)
+    score_listing = get_pod_listing(solid_client, provider, profile, resource)
     contents = get_contents_of_container(score_listing, resource)
     for item in contents:
-        file = get_resource_from_pod(provider, profile, item)
+        file = get_resource_from_pod(solid_client, provider, profile, item)
         graph = rdflib.Graph()
         graph.parse(file)
         matches = list(graph.triples((None, MO.published_as, URIRef(mei_external_uri))))
@@ -237,7 +239,9 @@ def find_score_for_external_uri(provider, profile, storage, mei_external_uri):
             return item
 
 
-def create_and_save_structure(provider, profile, storage, title, mei_payload: str, mei_external_uri, mei_copy_uri):
+def create_and_save_structure(
+    solid_client, provider, profile, storage, title, mei_payload: str, mei_external_uri, mei_copy_uri
+):
     """A 'score' is an RDF document that describes an MEI file and the segments that we generate
 
     <uuid> a mo:Score ;
@@ -270,26 +274,26 @@ def create_and_save_structure(provider, profile, storage, title, mei_payload: st
     score_data = score_graph.serialize(format="n3", encoding="utf-8")
 
     print("Making performance container:", performance_resource)
-    headers = get_bearer_for_user(provider, profile, performance_resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, performance_resource, "PUT")
     r = requests.put(performance_resource, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making timeline container:", timeline_resource)
-    headers = get_bearer_for_user(provider, profile, timeline_resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, timeline_resource, "PUT")
     r = requests.put(timeline_resource, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making score:", score_resource)
-    headers = get_bearer_for_user(provider, profile, score_resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, score_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(score_resource, data=score_data, headers=headers)
     r.raise_for_status()
     print(r.text)
 
     print("Making segment:", segment_resource)
-    headers = get_bearer_for_user(provider, profile, segment_resource, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, segment_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(segment_resource, data=segmentation_data, headers=headers)
     r.raise_for_status()
@@ -304,7 +308,7 @@ def get_uri_jsonld_or_none(uri, headers=None):
     except requests.exceptions.HTTPError as e:
         print("Error", e)
         print(" message:", e.response.text)
-        return None
+        return None, None
 
 
 def get_uri_jsonld(uri, headers=None):
@@ -313,7 +317,10 @@ def get_uri_jsonld(uri, headers=None):
     headers.update({"Accept": "application/ld+json"})
     r = requests.get(uri, headers=headers)
     r.raise_for_status()
-    return r.json()
+    logger.debug("Get json-ld from %s", uri)
+    logger.debug("json-ld headers: %s", r.headers)
+    logger.debug("json-ld content: %s", json.dumps(r.json(), indent=2))
+    return r.json(), r.headers
 
 
 def get_uri_ttl(uri, headers=None):
@@ -326,7 +333,7 @@ def get_uri_ttl(uri, headers=None):
 
 
 def get_storage_from_profile(profile_uri):
-    profile = get_uri_jsonld_or_none(profile_uri)
+    profile, headers = get_uri_jsonld_or_none(profile_uri)
     if profile is not None:
         expanded = jsonld.expand(profile, jsonld_context)
         id_card = [l for l in expanded if l.get("@id") == profile_uri]
@@ -340,18 +347,18 @@ def get_storage_from_profile(profile_uri):
     return None
 
 
-def save_performance_manifest(provider, profile, performance_uri, manifest):
+def save_performance_manifest(solid_client, provider, profile, performance_uri, manifest):
     print(f"Uploading manifest to {performance_uri}")
-    headers = get_bearer_for_user(provider, profile, performance_uri, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, performance_uri, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(performance_uri, data=manifest, headers=headers)
     r.raise_for_status()
     print("status:", r.text)
 
 
-def save_performance_timeline(provider, profile, timeline_uri, timeline):
+def save_performance_timeline(solid_client, provider, profile, timeline_uri, timeline):
     print(f"Uploading timeline to {timeline_uri}")
-    headers = get_bearer_for_user(provider, profile, timeline_uri, "PUT")
+    headers = solid_client.get_bearer_for_user(provider, profile, timeline_uri, "PUT")
     headers["content-type"] = "application/ld+json"
     r = requests.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
     r.raise_for_status()

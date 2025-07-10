@@ -1,15 +1,14 @@
 import os
+from logging.config import dictConfig
 
 import flask
 import sentry_sdk
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import jsonify, request
+from flask import current_app, jsonify, request, url_for
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
-from trompasolid import client
-from trompasolid.authentication import NoProviderError, authentication_callback, generate_authentication_url
-from trompasolid.backend.db_backend import DBBackend
+from solidauth import client
 
 from trompaalign import extensions, tasks
 from trompaalign.solid import (
@@ -35,14 +34,44 @@ def celery_init_app(app: flask.Flask) -> Celery:
     return celery_app
 
 
+def configure_logging():
+    print("Configuring logging")
+    dictConfig(
+        {
+            "version": 1,
+            "formatters": {
+                "default": {
+                    "format": "[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
+                }
+            },
+            "handlers": {
+                "wsgi": {
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://flask.logging.wsgi_errors_stream",
+                    "formatter": "default",
+                },
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stdout",
+                    "formatter": "default",
+                },
+            },
+            "root": {"level": "INFO", "handlers": ["wsgi"]},
+            "loggers": {
+                "trompaalign": {"level": "DEBUG", "handlers": ["console"], "propagate": False},
+            },
+        }
+    )
+
+
 def create_app():
+    configure_logging()
     app = flask.Flask(__name__, static_folder="/clara/static")
     app.config.from_pyfile("../config.py")
     extensions.db.init_app(app)
     extensions.redis_client.init_app(app)
     extensions.backend.init_app(app)
     extensions.cors.init_app(app)
-    client.set_backend(DBBackend(extensions.db.session))
 
     if app.config["SENTRY_DSN"]:
         sentry_sdk.init(
@@ -61,15 +90,53 @@ def create_app():
 webserver_bp = flask.Blueprint("trompaalign", __name__)
 
 
+def get_client_id_document_url_if_configured():
+    if current_app.config["ALWAYS_USE_CLIENT_URL"]:
+        return url_for("trompaalign.clara_jsonld")
+    else:
+        return None
+
+
+@webserver_bp.route("/clara.jsonld")
+def clara_jsonld():
+    # In Solid-OIDC you can register a client by having the "client_id" field be a URL to a json-ld document
+    # It's normally recommended that this is a static file, but for simplicity serve it from flask
+
+    baseurl = current_app.config["BASE_URL"]
+    if not baseurl.endswith("/"):
+        baseurl += "/"
+
+    client_information = {
+        "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
+        "client_id": baseurl + "clara.jsonld",
+        **current_app.config["CLIENT_REGISTRATION_DATA"],
+    }
+
+    response = jsonify(client_information)
+    response.content_type = "application/ld+json"
+    return response
+
+
 @webserver_bp.route("/api/auth/request", methods=["POST"])
 def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
 
     redirect_url = flask.current_app.config["REDIRECT_URL"]
-    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
+    client_id_document_url = get_client_id_document_url_if_configured()
+
+    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
+
+    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=use_client_id_document)
+
+    # if we always use a client url, generate the url and pass it to generate_authentication_url
+    # if it fails with ClientIDDocumentRegistrationNotSupportedError then we need to do dynamic registration
+    # this means we need to pass registration_request (current_app.config["CLIENT_REGISTRATION_DATA"]) and client_id_document_url=None
+    # if always_use_client_url is False then always do a dynamic registration
+
+    registration_request = current_app.config["CLIENT_REGISTRATION_DATA"]
     try:
-        data = generate_authentication_url(extensions.backend.backend, webid, redirect_url, always_use_client_url)
+        data = cl.generate_authentication_url(webid, registration_request, redirect_url, client_id_document_url)
 
         provider = data["provider"]
         flask.session["provider"] = provider
@@ -81,7 +148,7 @@ def auth_request():
 
         return jsonify(data)
 
-    except NoProviderError as e:
+    except client.NoProviderError as e:
         return jsonify({"error": str(e)}), 400
 
 
@@ -95,9 +162,8 @@ def auth_callback():
     redirect_uri = flask.current_app.config["REDIRECT_URL"]
     base_url = flask.current_app.config["BASE_URL"]
     always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    success, data = authentication_callback(
-        extensions.backend.backend, auth_code, state, provider, redirect_uri, base_url, always_use_client_url
-    )
+    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
+    success, data = cl.authentication_callback(auth_code, state, provider, redirect_uri, base_url)
 
     return jsonify({"status": success, "data": data})
 
@@ -110,7 +176,12 @@ def check_user_perms():
         return jsonify({"status": "error"}), 400
 
     provider = lookup_provider_from_profile(profile_url)
-    configuration = extensions.backend.backend.get_configuration_token(issuer=provider, profile=profile_url)
+    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
+    configuration = extensions.backend.backend.get_configuration_token(
+        issuer=provider,
+        profile=profile_url,
+        use_client_id_document=always_use_client_url,
+    )
     has_permission = configuration is not None and bool(configuration.data) and "refresh_token" in configuration.data
 
     return jsonify({"has_permission": has_permission})
