@@ -475,6 +475,18 @@ wheels = [
 ]
 
 [[package]]
+name = "gunicorn"
+version = "23.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/72/9614c465dc206155d93eff0ca20d42e1e35afc533971379482de953521a4/gunicorn-23.0.0.tar.gz", hash = "sha256:f014447a0101dc57e294f6c18ca6b40227a4c90e9bdb586042628030cba004ec", size = 375031, upload-time = "2024-08-10T20:25:27.378Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/7d/6dac2a6e1eba33ee43f318edbed4ff29151a49b5d37f080aad1e6469bca4/gunicorn-23.0.0-py3-none-any.whl", hash = "sha256:ec400d38950de4dfd418cff8328b2c8faed0edb0d517d3394e457c317908ca4d", size = 85029, upload-time = "2024-08-10T20:25:24.996Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -686,6 +698,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bc/22/1f46483b2095750161b862a034e334bf471f4a8c865e39058502983a73ea/oic-1.7.0.tar.gz", hash = "sha256:e51705d0c14c97e9ca594374bfb54269a72c9b489e0e979598344c0189bfcb64", size = 260752, upload-time = "2024-04-25T15:13:52.807Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/1d/7a8f80ab17f9d78c05de9d998d501baf71c81d2f3a27b86bde45ca14c55f/oic-1.7.0-py3-none-any.whl", hash = "sha256:b74bd06c7de1ab4f8e798f714062e6a68f68ad9cdbed1f1c30a7fb887602f321", size = 192399, upload-time = "2024-04-25T15:13:50.535Z" },
+]
+
+[[package]]
+name = "packaging"
+version = "25.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
 ]
 
 [[package]]
@@ -1009,9 +1030,9 @@ wheels = [
 ]
 
 [[package]]
-name = "solid-oidc-app-permission"
+name = "solidauth-oidc"
 version = "0.1.0"
-source = { editable = "../solid-oidc-app-permission" }
+source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#7feb7570392cbd46de32fcbfea1fe3573dfe99b1" }
 dependencies = [
     { name = "click" },
     { name = "flask" },
@@ -1035,34 +1056,6 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "wtforms" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = "~=8.1.0" },
-    { name = "flask", specifier = "~=3.1.0" },
-    { name = "flask-admin", specifier = "~=1.6.1" },
-    { name = "flask-bcrypt", specifier = "~=1.0.1" },
-    { name = "flask-login", specifier = "~=0.6.3" },
-    { name = "flask-redis", specifier = "~=0.4.0" },
-    { name = "flask-shell-ipython", specifier = "~=0.5.3" },
-    { name = "flask-sqlalchemy", specifier = "~=3.1.1" },
-    { name = "flask-wtf", specifier = "~=1.2.2" },
-    { name = "ipython", specifier = "~=8.35.0" },
-    { name = "jinja2", specifier = "~=3.1.2" },
-    { name = "jwcrypto", specifier = "~=1.5.6" },
-    { name = "oic", specifier = ">=1.7.0" },
-    { name = "psycopg2-binary", specifier = "~=2.9.10" },
-    { name = "pyjwt", specifier = "~=2.10.0" },
-    { name = "python-dotenv", specifier = "~=1.1.0" },
-    { name = "rdflib", specifier = "~=6.2.0" },
-    { name = "redis", specifier = "~=5.2.1" },
-    { name = "requests", specifier = "~=2.32.0" },
-    { name = "sqlalchemy", specifier = "~=2.0.1" },
-    { name = "wtforms", specifier = "~=3.2.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.4.1" }]
 
 [[package]]
 name = "sqlalchemy"
@@ -1136,9 +1129,14 @@ dependencies = [
     { name = "redis" },
     { name = "requests" },
     { name = "sentry-sdk", extra = ["flask"] },
-    { name = "solid-oidc-app-permission" },
+    { name = "solidauth-oidc" },
     { name = "sqlalchemy" },
     { name = "verovio" },
+]
+
+[package.dev-dependencies]
+prod = [
+    { name = "gunicorn" },
 ]
 
 [package.metadata]
@@ -1166,10 +1164,13 @@ requires-dist = [
     { name = "redis", specifier = "~=5.2.1" },
     { name = "requests", specifier = "~=2.32.0" },
     { name = "sentry-sdk", extras = ["flask"], specifier = "~=2.27.0" },
-    { name = "solid-oidc-app-permission", editable = "../solid-oidc-app-permission" },
+    { name = "solidauth-oidc", git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main" },
     { name = "sqlalchemy", specifier = "~=2.0.1" },
     { name = "verovio", specifier = "~=3.14.0" },
 ]
+
+[package.metadata.requires-dev]
+prod = [{ name = "gunicorn" }]
 
 [[package]]
 name = "typing-extensions"

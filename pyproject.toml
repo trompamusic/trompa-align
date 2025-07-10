@@ -28,13 +28,18 @@ dependencies = [
     "redis~=5.2.1",
     "requests~=2.32.0",
     "sentry-sdk[flask]~=2.27.0",
-    "solid-oidc-app-permission",
+    "solidauth-oidc",
     "sqlalchemy~=2.0.1",
     "verovio~=3.14.0",
 ]
 
+[dependency-groups]
+prod = [
+  "gunicorn"
+]
+
 [tool.uv.sources]
-solidauth = { git = "https://github.com/trompamusic/solidauth-oidc.git", rev = "main" }
+solidauth-oidc = { git = "https://github.com/trompamusic/solidauth-oidc.git", rev = "main" }
 
 [tool.ruff]
 line-length = 120

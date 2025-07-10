@@ -4,45 +4,43 @@ volumes:
 services:
   web:
     image: trompa-align
-    build: .
-    ports:
-      - "8000:5000"
-    environment:
-      PYTHONUNBUFFERED: 1
-    command:
-      - flask
-      - --debug
-      - run
-      - --host=0.0.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    env_file: production-environment
+    restart: always
+    expose:
+      - "8000"
     volumes:
-      - "./.root-home:/root"
-      - ".:/code"
-      - "/code/.venv"
+      - "${CLARA_BUILD_DIRECTORY}:/clara"
 
   redis:
     image: "redis:alpine"
 
   celery:
     image: trompa-align
+    restart: always
+    env_file: celery-environment
     command:
+      - uv
+      - run
       - celery
       - -A
       - trompaalign.celery
       - worker
-    volumes:
-      - ".:/code"
 
   db:
     image: postgres
+    restart: always
     environment:
       POSTGRES_PASSWORD: example
       POSTGRES_DB: solid_oidc
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
   fluentd:
     image: fluent/fluentd:v1.12.0-debian-1.0
+    restart: always
     volumes:
       - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
