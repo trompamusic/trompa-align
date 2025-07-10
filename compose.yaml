@@ -1,0 +1,49 @@
+volumes:
+  pgdata:
+
+services:
+  web:
+    image: trompa-align
+    build: .
+    ports:
+      - "8000:5000"
+    environment:
+      PYTHONUNBUFFERED: 1
+      FLASK_DEBUG: 1
+    command:
+      - flask
+      - --debug
+      - run
+      - --host=0.0.0.0
+    volumes:
+      - "./.root-home:/root"
+      - ".:/code"
+      - "/code/.venv"
+
+  redis:
+    image: "redis:alpine"
+
+  celery:
+    image: trompa-align
+    command:
+      - celery
+      - -A
+      - trompaalign.celery
+      - worker
+    volumes:
+      - ".:/code"
+
+  db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: solid_oidc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  fluentd:
+    image: fluent/fluentd:v1.12.0-debian-1.0
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf

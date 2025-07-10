@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.11 AS base
 
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=1 \
@@ -32,6 +32,11 @@ COPY ./install-packages.R /code
 RUN Rscript /code/install-packages.R
 
 COPY pyproject.toml uv.lock /code/
-RUN --mount=type=cache,target=/home/app/.cache/uv uv sync --frozen
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 
 COPY . /code
+
+FROM base AS production
+
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
+CMD ["uv", "run", "gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]
