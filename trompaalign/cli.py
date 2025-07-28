@@ -5,8 +5,10 @@ import click
 import requests
 import requests.utils
 from flask import current_app
+from trompaalign.extensions import db
 from flask.cli import AppGroup
 from solidauth import client
+from solidauth.db import Base
 
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
@@ -28,6 +30,18 @@ from trompaalign.solid import (
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
+db_bp = AppGroup("db", help="Database commands")
+
+
+@db_bp.command("create-database")
+def cmd_create_database():
+    """Create a user in the database"""
+    # This doesn't use the Flask-SQLAlchemy create_all method, as we have other
+    # tables that aren't part of that extension's declarative base
+    print("Creating database tables...")
+    db.create_all()
+    Base.metadata.create_all(db.engine)
+    print("Done")
 
 
 @cli.command("list-pod")
@@ -145,7 +159,7 @@ def cmd_add_clara_to_pod(profile):
 @click.argument("resource")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_get_resource(use_json, profile, resource, use_client_id_document):
-    """Get a resource, authenticating as a specific user"""
+    """Get a resource"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -371,7 +385,7 @@ def cmd_upload_midi_to_pod(profile, file):
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def add_turtle(profile, resource, file, use_client_id_document):
-    """Upload any file to a pod"""
+    """Upload any file to a pod with text/turtle content type"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -390,11 +404,11 @@ def add_turtle(profile, resource, file, use_client_id_document):
     print(r.text)
 
 
-@cli.command("get-turtle")
+@cli.command("get-file")
 @click.argument("profile")
 @click.argument("resource")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def get_turtle(profile, resource, use_client_id_document):
+def get_file(profile, resource, use_client_id_document):
     """Get any file from a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:

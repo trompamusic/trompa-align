@@ -5,10 +5,11 @@ import flask
 import sentry_sdk
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import current_app, jsonify, request, url_for
+from flask import current_app, jsonify, request
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client
+import solidauth
 
 from trompaalign import extensions, tasks
 from trompaalign.solid import (
@@ -83,6 +84,16 @@ def create_app():
             traces_sample_rate=1.0,
         )
 
+    with app.app_context():
+        # On startup, generate keys if they don't exist
+        if extensions.backend.backend.is_ready():
+            if not extensions.backend.backend.get_relying_party_keys():
+                print("On startup generating new RP keys")
+                new_key = solidauth.solid.generate_keys()
+                extensions.backend.backend.save_relying_party_keys(new_key)
+        else:
+            print("Warning: Backend isn't ready yet")
+
     celery_init_app(app)
     return app
 
@@ -92,7 +103,7 @@ webserver_bp = flask.Blueprint("trompaalign", __name__)
 
 def get_client_id_document_url_if_configured():
     if current_app.config["ALWAYS_USE_CLIENT_URL"]:
-        return url_for("trompaalign.clara_jsonld")
+        return current_app.config["CLIENT_ID_DOCUMENT_URL"]
     else:
         return None
 
@@ -122,6 +133,8 @@ def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
 
+    # This redirect URL is the react app: It will receive the code and state, and then perform an API request
+    # to /api/auth/callback
     redirect_url = flask.current_app.config["REDIRECT_URL"]
     client_id_document_url = get_client_id_document_url_if_configured()
 
@@ -159,12 +172,11 @@ def auth_callback():
 
     provider = flask.session["provider"]
 
-    redirect_uri = flask.current_app.config["REDIRECT_URL"]
-    base_url = flask.current_app.config["BASE_URL"]
+    redirect_url = flask.current_app.config["REDIRECT_URL"]
+    client_id_document_url = get_client_id_document_url_if_configured()
     always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
     cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
-    success, data = cl.authentication_callback(auth_code, state, provider, redirect_uri, base_url)
-
+    success, data = cl.authentication_callback(auth_code, state, provider, redirect_url, client_id_document_url)
     return jsonify({"status": success, "data": data})
 
 

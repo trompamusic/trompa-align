@@ -333,18 +333,15 @@ def get_uri_ttl(uri, headers=None):
 
 
 def get_storage_from_profile(profile_uri):
-    profile, headers = get_uri_jsonld_or_none(profile_uri)
-    if profile is not None:
-        expanded = jsonld.expand(profile, jsonld_context)
-        id_card = [l for l in expanded if l.get("@id") == profile_uri]
-        if id_card:
-            id_card = id_card[0]
-            storage = id_card.get("http://www.w3.org/ns/pim/space#storage", [])
-            if isinstance(storage, list) and storage:
-                return storage[0].get("@id")
-            elif storage:
-                return storage.get("@id")
-    return None
+    graph = rdflib.Graph()
+    graph.parse(profile_uri)
+    storage = graph.value(
+        subject=rdflib.URIRef(profile_uri), predicate=rdflib.URIRef("http://www.w3.org/ns/pim/space#storage")
+    )
+    if storage is None:
+        print("No storage found")
+        return None
+    return storage.toPython()
 
 
 def save_performance_manifest(solid_client, provider, profile, performance_uri, manifest):

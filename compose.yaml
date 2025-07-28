@@ -4,12 +4,17 @@ volumes:
 services:
   web:
     image: trompa-align
-    build: .
+    build:
+      context: .
+      target: base
+    platform: linux/amd64
     ports:
       - "8000:5000"
     environment:
       PYTHONUNBUFFERED: 1
       FLASK_DEBUG: 1
+    env_file:
+      - env.docker
     command:
       - flask
       - --debug
@@ -30,8 +35,11 @@ services:
       - -A
       - trompaalign.celery
       - worker
+    env_file:
+      - env.docker
     volumes:
       - ".:/code"
+      - "/code/.venv"
 
   db:
     image: postgres

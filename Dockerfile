@@ -2,7 +2,8 @@ FROM python:3.11 AS base
 
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=1 \
-  UV_PYTHON_DOWNLOADS=never
+  UV_PYTHON_DOWNLOADS=never \
+  UV_NO_SYNC=1
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -34,9 +35,11 @@ RUN Rscript /code/install-packages.R
 COPY pyproject.toml uv.lock /code/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 
+ENV PATH="/code/.venv/bin:$PATH"
+
 COPY . /code
 
 FROM base AS production
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
-CMD ["uv", "run", "gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]

@@ -1,28 +1,27 @@
 import os
 
-REDIS_URL = os.getenv("CONFIG_REDIS_URL")
+REDIS_URL = os.getenv("TR_ALIGN_REDIS_URL")
 
-SECRET_KEY = os.getenv("CONFIG_SECRET_KEY")
-env = os.getenv("ENV")
-if env == "local":
-    SQLALCHEMY_DATABASE_URI = os.getenv("CONFIG_SQLALCHEMY_DATABASE_URI_LOCAL")
-else:
-    SQLALCHEMY_DATABASE_URI = os.getenv("CONFIG_SQLALCHEMY_DATABASE_URI_DOCKER")
+SECRET_KEY = os.getenv("TR_ALIGN_SECRET_KEY")
+SQLALCHEMY_DATABASE_URI = os.getenv("TR_ALIGN_SQLALCHEMY_DATABASE_URI")
 
-BASE_URL = os.getenv("CONFIG_BASE_URL")
-REDIRECT_URL = os.path.join(BASE_URL, "api/auth/callback")
+BASE_URL = os.getenv("TR_ALIGN_BASE_URL")
+REDIRECT_URL = os.path.join(BASE_URL, "auth/callback")
 # When deployed on production, we can redirect to the react app (base url), or /api/auth/callback (API)
 REDIRECT_URLS = [REDIRECT_URL, BASE_URL]
 
 # When accessing an OP, should you register a client ID ahead of time, or submit a URL?
 #  if the OP doesn't support client registration, it'll always submit a URL
-ALWAYS_USE_CLIENT_URL = False
+ALWAYS_USE_CLIENT_URL = os.getenv("TR_ALIGN_ALWAYS_USE_CLIENT_URL", "true").lower() == "true"
+CLIENT_ID_DOCUMENT_URL = os.getenv("TR_ALIGN_CLIENT_ID_DOCUMENT_URL", None)
+if ALWAYS_USE_CLIENT_URL and CLIENT_ID_DOCUMENT_URL is None:
+    raise ValueError("TR_ALIGN_CLIENT_ID_DOCUMENT_URL must be set if TR_ALIGN_ALWAYS_USE_CLIENT_URL is true")
 
-BACKEND = os.getenv("CONFIG_BACKEND")
+BACKEND = os.getenv("TR_ALIGN_BACKEND")
 if BACKEND not in ["redis", "db"]:
-    raise ValueError("CONFIG_BACKEND must be 'redis' or 'db'")
+    raise ValueError("TR_ALIGN_BACKEND must be 'redis' or 'db'")
 
-SENTRY_DSN = os.getenv("CONFIG_SENTRY_DSN")
+SENTRY_DSN = os.getenv("TR_ALIGN_SENTRY_DSN")
 
 CELERY = {
     "broker_url": REDIS_URL,
@@ -30,7 +29,7 @@ CELERY = {
     "task_ignore_result": True,
 }
 
-LOCAL_DEV = os.getenv("CONFIG_LOCAL_DEV") == "true"
+LOCAL_DEV = os.getenv("TR_ALIGN_LOCAL_DEV") == "true"
 
 
 CLIENT_REGISTRATION_DATA = {
@@ -47,10 +46,8 @@ CLIENT_REGISTRATION_DATA = {
 }
 
 if LOCAL_DEV:
-    # React app on :3000, Flask app on :5000
-    CLIENT_REGISTRATION_DATA["redirect_uris"].extend(
-        ["http://localhost:3000", "http://localhost:5000/api/auth/callback"]
-    )
+    # React app on :3000 for js auth, and /auth/callback handler to send requests to the backend
+    CLIENT_REGISTRATION_DATA["redirect_uris"].extend(["http://localhost:3000", "http://localhost:3000/auth/callback"])
 
 # TODO: Dynamic registration from solid-oidc originally included these additional fields:
 #  grant_types: client_credentials  -  at least one provider (Redpencil) fails if we send this
