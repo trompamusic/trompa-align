@@ -4,8 +4,7 @@ import os
 import click
 import requests
 import requests.utils
-from flask import current_app
-from trompaalign.extensions import db
+from trompaalign.extensions import db, backend
 from flask.cli import AppGroup
 from solidauth import client
 from solidauth.db import Base
@@ -50,7 +49,7 @@ def cmd_create_database():
 def cmd_list_containers_in_pod(profile, use_client_id_document):
     """List containers in a pod."""
     print(f"Looking up data for profile {profile}")
-    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -74,7 +73,7 @@ def cmd_list_containers_in_pod(profile, use_client_id_document):
 @click.argument("profile")
 @click.argument("container")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_list_container(use_json, profile, container):
+def cmd_list_container(use_json, profile, container, use_client_id_document):
     """Get the contents of a container"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -88,13 +87,13 @@ def cmd_list_container(use_json, profile, container):
 
     print(f"Storage: {storage}")
 
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     if use_json:
-        response = get_pod_listing(provider, profile, container)
+        response = get_pod_listing(cl, provider, profile, container)
         print(json.dumps(response, indent=2))
     else:
-        response = get_pod_listing_ttl(provider, profile, container)
+        response = get_pod_listing_ttl(cl, provider, profile, container)
         print(response)
-    return
     if response is not None:
         contents = get_contents_of_container(response, container)
         for item in contents:
@@ -104,7 +103,7 @@ def cmd_list_container(use_json, profile, container):
 @cli.command("list-clara")
 @click.argument("profile")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_check_pod_for_clara(profile):
+def cmd_check_pod_for_clara(profile, use_client_id_document):
     """List clara content in a pod.
 
     If a pod has a clara directory, list the items in it.
@@ -122,8 +121,9 @@ def cmd_check_pod_for_clara(profile):
 
     print(f"Storage: {storage}")
 
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    listing = get_pod_listing(provider, profile, clara_container)
+    listing = get_pod_listing(cl, provider, profile, clara_container)
     print(json.dumps(listing, indent=2))
     if listing is None:
         print("User storage doesn't include clara container. Use `create-clara` command")
@@ -138,7 +138,7 @@ def cmd_check_pod_for_clara(profile):
 @cli.command("create-clara")
 @click.argument("profile")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_add_clara_to_pod(profile):
+def cmd_add_clara_to_pod(profile, use_client_id_document):
     """Create the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -150,7 +150,8 @@ def cmd_add_clara_to_pod(profile):
         print("Cannot find storage, quitting")
         return
 
-    create_clara_container(provider, profile, storage)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    create_clara_container(cl, provider, profile, storage)
 
 
 @cli.command("get-resource")
@@ -166,7 +167,7 @@ def cmd_get_resource(use_json, profile, resource, use_client_id_document):
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     if use_json:
         type_headers = {"Accept": "application/ld+json"}
@@ -187,21 +188,22 @@ def cmd_get_resource(use_json, profile, resource, use_client_id_document):
 @click.argument("item")
 @click.argument("title")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_patch_container_title(profile, container, item, title):
+def cmd_patch_container_title(profile, container, item, title, use_client_id_document):
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
         return
 
-    patch_container_item_title(provider, profile, container, item, title)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    patch_container_item_title(cl, provider, profile, container, item, title)
 
 
 @cli.command("get-score-for-url")
 @click.argument("profile")
 @click.argument("score_url")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_get_score_for_url(profile, score_url):
+def cmd_get_score_for_url(profile, score_url, use_client_id_document):
     """Find the score container for a given score external URL"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -213,7 +215,8 @@ def cmd_get_score_for_url(profile, score_url):
         print("Cannot find storage, quitting")
         return
 
-    score = find_score_for_external_uri(provider, profile, storage, score_url)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    score = find_score_for_external_uri(cl, provider, profile, storage, score_url)
     if score:
         print(f"External MEI URL is in this user's solid pod as {score}")
 
@@ -229,7 +232,7 @@ def recursive_delete_from_pod(solid_client, provider, profile, container):
     otherwise, just delete it.
     After recursing into it, delete the container itself, as it'll be empty.
     """
-    listing = get_pod_listing(provider, profile, container)
+    listing = get_pod_listing(solid_client, provider, profile, container)
     for item in listing.get("@graph", []):
         item_id = item["@id"]
         # First item is ourselves, skip it
@@ -237,7 +240,7 @@ def recursive_delete_from_pod(solid_client, provider, profile, container):
             continue
         if "ldp:Container" in item["@type"]:
             # If the container has other containers, delete them
-            recursive_delete_from_pod(provider, profile, item["@id"])
+            recursive_delete_from_pod(solid_client, provider, profile, item["@id"])
         else:
             # Otherwise it's just a file, delete it.
             headers = solid_client.get_bearer_for_user(provider, profile, item_id, "DELETE")
@@ -252,7 +255,7 @@ def recursive_delete_from_pod(solid_client, provider, profile, container):
 @click.argument("profile")
 @click.option("-c", "--container")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_delete_clara_container_from_pod(profile, container):
+def cmd_delete_clara_container_from_pod(profile, container, use_client_id_document):
     """Delete the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -264,17 +267,18 @@ def cmd_delete_clara_container_from_pod(profile, container):
         print("Cannot find storage, quitting")
         return
 
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     if container is None:
         clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
     else:
         clara_container = os.path.join(storage, container)
-    listing = get_pod_listing(provider, profile, clara_container)
+    listing = get_pod_listing(cl, provider, profile, clara_container)
     if listing is None:
         print("Pod has no clara storage, quitting")
         return
 
     # To delete, we need to recursively delete everything one by one
-    recursive_delete_from_pod(provider, profile, clara_container)
+    recursive_delete_from_pod(cl, provider, profile, clara_container)
 
 
 @cli.command("delete")
@@ -289,7 +293,7 @@ def cmd_delete_resource(profile, resource, use_client_id_document):
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "DELETE")
     requests.delete(resource, headers=headers)
 
@@ -300,7 +304,7 @@ def cmd_delete_resource(profile, resource, use_client_id_document):
 @click.option("--file", default=None)
 @click.option("--title", default=None)
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_score_to_pod(profile, url, file, title):
+def cmd_upload_score_to_pod(profile, url, file, title, use_client_id_document):
     """Upload an MEI score to a pod"""
     print(f"Looking up data for profile {profile}")
 
@@ -331,17 +335,18 @@ def cmd_upload_score_to_pod(profile, url, file, title):
         r.raise_for_status()
         payload = r.text
 
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     title = get_title_from_mei(payload, filename)
-    mei_copy_uri = upload_mei_to_pod(provider, profile, storage, payload)
+    mei_copy_uri = upload_mei_to_pod(cl, provider, profile, storage, payload)
 
-    create_and_save_structure(provider, profile, storage, title, payload, url, mei_copy_uri)
+    create_and_save_structure(cl, provider, profile, storage, title, payload, url, mei_copy_uri)
 
 
 @cli.command("upload-webmidi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_webmidi_to_pod(profile, file):
+def cmd_upload_webmidi_to_pod(profile, file, use_client_id_document):
     """Upload a webmidi performance to a pod, convert to midi, and upload the midi"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -354,7 +359,8 @@ def cmd_upload_webmidi_to_pod(profile, file):
 
     payload = open(file, "rb").read()
 
-    resource = upload_webmidi_to_pod(provider, profile, storage, payload)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    resource = upload_webmidi_to_pod(cl, provider, profile, storage, payload)
     print(f"Uploaded: {resource}")
 
 
@@ -362,7 +368,7 @@ def cmd_upload_webmidi_to_pod(profile, file):
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_midi_to_pod(profile, file):
+def cmd_upload_midi_to_pod(profile, file, use_client_id_document):
     """Upload a midi performance to a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -375,7 +381,8 @@ def cmd_upload_midi_to_pod(profile, file):
 
     payload = open(file, "rb").read()
 
-    resource = upload_midi_to_pod(provider, profile, storage, payload)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    resource = upload_midi_to_pod(cl, provider, profile, storage, payload)
     print(f"Uploaded: {resource}")
 
 
@@ -397,7 +404,7 @@ def add_turtle(profile, resource, file, use_client_id_document):
 
     payload = open(file, "rb").read()
     print(f"Uploading file {resource}")
-    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(resource, data=payload, headers=headers)
@@ -420,7 +427,7 @@ def get_file(profile, resource, use_client_id_document):
         return
 
     print(f"Getting file {resource}")
-    cl = client.SolidClient(current_app.extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     r = requests.get(resource, headers=headers)
     print(r.text)
@@ -429,7 +436,8 @@ def get_file(profile, resource, use_client_id_document):
 @cli.command("options")
 @click.argument("profile")
 @click.argument("resource")
-def cmd_options(profile, resource):
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_options(profile, resource, use_client_id_document):
     """run HTTP OPTIONS on a resource"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -437,7 +445,8 @@ def cmd_options(profile, resource):
         return
 
     print(f"Running OPTIONS on {resource}")
-    headers, content = http_options(provider, profile, resource)
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    headers, content = http_options(cl, provider, profile, resource)
     for h, v in headers.items():
         print(f"{h}: {v}")
     print(content)
