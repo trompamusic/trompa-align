@@ -496,6 +496,15 @@ wheels = [
 ]
 
 [[package]]
+name = "iniconfig"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
+]
+
+[[package]]
 name = "ipython"
 version = "8.35.0"
 source = { registry = "https://pypi.org/simple" }
@@ -731,6 +740,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pluggy"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.51"
 source = { registry = "https://pypi.org/simple" }
@@ -933,6 +951,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest"
+version = "8.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/ba/45911d754e8eba3d5a841a5ce61a65a685ff1798421ac054f85aa8747dfb/pytest-8.4.1.tar.gz", hash = "sha256:7c67fd69174877359ed9371ec3af8a3d2b04741818c51e5e99cc1742251fa93c", size = 1517714, upload-time = "2025-06-18T05:48:06.109Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/16/c8a903f4c4dffe7a12843191437d7cd8e32751d5de349d45d3fe69544e87/pytest-8.4.1-py3-none-any.whl", hash = "sha256:539c70ba6fcead8e78eebbf1115e8b589e7565830d7d006a8723f19ac8a0afb7", size = 365474, upload-time = "2025-06-18T05:48:03.955Z" },
+]
+
+[[package]]
 name = "python-dotenv"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1057,7 +1091,7 @@ wheels = [
 [[package]]
 name = "solidauth-oidc"
 version = "0.1.0"
-source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#7feb7570392cbd46de32fcbfea1fe3573dfe99b1" }
+source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#72f1cba8a7e7fc0609d072a93d0f4f7700598ee0" }
 dependencies = [
     { name = "click" },
     { name = "flask" },
@@ -1161,6 +1195,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pytest" },
     { name = "ruff" },
 ]
 prod = [
@@ -1194,11 +1229,14 @@ requires-dist = [
     { name = "sentry-sdk", extras = ["flask"], specifier = "~=2.27.0" },
     { name = "solidauth-oidc", git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main" },
     { name = "sqlalchemy", specifier = "~=2.0.1" },
-    { name = "verovio", specifier = "~=3.14.0" },
+    { name = "verovio", specifier = "~=5.5.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.12.5" }]
+dev = [
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "ruff", specifier = ">=0.12.5" },
+]
 prod = [{ name = "gunicorn" }]
 
 [[package]]
@@ -1242,15 +1280,15 @@ wheels = [
 
 [[package]]
 name = "verovio"
-version = "3.14.0"
+version = "5.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/91/4e/fc7e0278c3cc85d3ec3a5cfd8a85acc63ccd7e8f260977a8fee7032ac0be/verovio-3.14.0.tar.gz", hash = "sha256:e56db1aae9edb02b9b38f5087a0e573435125ec0bffb8d74974a96d96f9f1603", size = 2743599, upload-time = "2022-12-23T10:01:56.608Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/48/4b7f1dc03c66c6502057faad145d9f247a8101b3ed1525bd32e0bcccc2b2/verovio-5.5.0.tar.gz", hash = "sha256:5ee40b8d97a93b599dd6e39d814f36d785575848b7d06e4cbc939542b8026be3", size = 3885856, upload-time = "2025-08-04T11:40:13.26Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/10/6dee9c29756d9bdad42d407fb4ea401473fa87fa38dd6d210ef7037d53d6/verovio-3.14.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:8f697818a474fcad8d46a8ed0b8e16c9dda8c5f76baa2f26b354c31fb628c74f", size = 5915582, upload-time = "2022-12-23T10:01:11.954Z" },
-    { url = "https://files.pythonhosted.org/packages/0e/85/93539b52976a91d476abf99fd4bdacb2a069f5bc0eb4a08a23028a56df4b/verovio-3.14.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:2dd405ac494793143fdce301ccc16f5881aa6cc16fa318a17b8d8ca34b372c47", size = 5601192, upload-time = "2022-12-23T10:01:14.719Z" },
-    { url = "https://files.pythonhosted.org/packages/0c/48/37eaef63b678aee7da28376414b6883b447fd902b47d81129c5269656d47/verovio-3.14.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d57abd21ffc8beddcf5acc62de8de19b7196bfbab706c60446809073819dc75b", size = 6996892, upload-time = "2022-12-23T10:01:17.241Z" },
-    { url = "https://files.pythonhosted.org/packages/8d/3e/c99f2d6bf66d8f2d91a1e94c2aacf5fc0481c3a58dd1dc21a69c4def5c88/verovio-3.14.0-cp311-cp311-win32.whl", hash = "sha256:30b04016901330fa59eb6827f03059e6fa19d5bb1be7387c605c73eb18816cf8", size = 3901697, upload-time = "2022-12-23T10:01:19.313Z" },
-    { url = "https://files.pythonhosted.org/packages/48/83/44468ab89f6c9c9fddb16170aee2ba4744ef0057f0d5cc324b7aa591058b/verovio-3.14.0-cp311-cp311-win_amd64.whl", hash = "sha256:839a3e983bcf19c8626e03418a6cf9bba31bb26fe5fa0fa8d0db175f37bf62c8", size = 4266459, upload-time = "2022-12-23T10:01:21.338Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/54/bccac8cf789c610d6220ab7f381d1df3615b2ea24051633a09c6d20bd784/verovio-5.5.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:aeae9cf16800426b671c8299f7317bc3a99b488c08e248ae211f1e58fbe6d8ee", size = 7031746, upload-time = "2025-08-04T11:39:28.009Z" },
+    { url = "https://files.pythonhosted.org/packages/75/79/38bdea55248d7947d9227eaee4574bb3652a468bc836285af73d11ed90f3/verovio-5.5.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:1dd650879096bb53b2ff0b1dd534716d6a6a4cf77e86f1e04847def61540fb5c", size = 7360898, upload-time = "2025-08-04T11:39:29.925Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/33/1885a421ed02e5ba0bd5f30ac42cf8329eabbb782788dcbaca4ffafd0c32/verovio-5.5.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:1fdc0d26142cc12a3e69ab15d3c34ff958d0f1799ca1db97c662aa7943635940", size = 8651938, upload-time = "2025-08-04T11:39:33.122Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/00/d348c3279149550bb52276e62449a94a7cd5a09563947b338e448b305451/verovio-5.5.0-cp311-cp311-win32.whl", hash = "sha256:0697c0e5009627c3211fd8009871eb756502e67e09555883743052c3a9abedaf", size = 4767654, upload-time = "2025-08-04T11:39:36.703Z" },
+    { url = "https://files.pythonhosted.org/packages/42/7d/e1d6bcc0e9290915b62e0edda295b96a7f306f96a362312e32356ed8c87f/verovio-5.5.0-cp311-cp311-win_amd64.whl", hash = "sha256:56470a9e843bcc2cb63d816112196447b4388be3ffae8f2db0b1c1b77604f5bc", size = 5261387, upload-time = "2025-08-04T11:39:35.052Z" },
 ]
 
 [[package]]

@@ -177,6 +177,8 @@ def get_title_from_mei(payload, filename):
             title += " - " + metadata["composer"]
         if title:
             return title
+        else:
+            return filename
     else:
         return filename
 
@@ -251,7 +253,9 @@ def create_and_save_structure(
     <pod-url/path/to/MEI/copy.mei> a mo:PublishedScore ;
       skos:exactMatch <external URL>.
 
-    TODO: We don't need to create a new structure if we already have one for this mei_external_uri
+    TODO: We don't need to create a new structure if we already have one for this mei_external_uri.
+      Currently we have a check for this in the frontend, so we shouldn't call the API if this is the case
+      However if another endpoint calls the API directly, it may cause duplicates.
     """
 
     score_id = str(uuid.uuid4())
@@ -275,27 +279,27 @@ def create_and_save_structure(
 
     print("Making performance container:", performance_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, performance_resource, "PUT")
-    r = requests.put(performance_resource, headers=headers)
+    r = requests.put(performance_resource, headers=headers, timeout=10)
     r.raise_for_status()
     print(r.text)
 
     print("Making timeline container:", timeline_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, timeline_resource, "PUT")
-    r = requests.put(timeline_resource, headers=headers)
+    r = requests.put(timeline_resource, headers=headers, timeout=10)
     r.raise_for_status()
     print(r.text)
 
     print("Making score:", score_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, score_resource, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(score_resource, data=score_data, headers=headers)
+    r = requests.put(score_resource, data=score_data, headers=headers, timeout=10)
     r.raise_for_status()
     print(r.text)
 
     print("Making segment:", segment_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, segment_resource, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(segment_resource, data=segmentation_data, headers=headers)
+    r = requests.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
     r.raise_for_status()
     print(r.text)
 
@@ -350,7 +354,7 @@ def save_performance_manifest(solid_client, provider, profile, performance_uri, 
     headers["content-type"] = "text/turtle"
     r = requests.put(performance_uri, data=manifest, headers=headers)
     r.raise_for_status()
-    print("status:", r.text)
+    print("save_performance_manifest status:", r.text)
 
 
 def save_performance_timeline(solid_client, provider, profile, timeline_uri, timeline):
@@ -359,4 +363,4 @@ def save_performance_timeline(solid_client, provider, profile, timeline_uri, tim
     headers["content-type"] = "application/ld+json"
     r = requests.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
     r.raise_for_status()
-    print("status:", r.text)
+    print("save_performance_timeline status:", r.text)

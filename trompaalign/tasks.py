@@ -4,6 +4,7 @@ import tempfile
 import urllib.error
 import uuid
 
+from flask import current_app
 import rdflib
 import requests
 from celery import shared_task
@@ -13,6 +14,8 @@ from scripts.convert_to_rdf import graph_to_jsonld, graph_to_turtle
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
+from solidauth import client
+from trompaalign.extensions import backend
 from trompaalign.mei import mei_is_valid
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
@@ -61,6 +64,10 @@ def add_score(profile, mei_external_uri):
     :param mei_external_uri:
     :return:
     """
+
+    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -71,24 +78,29 @@ def add_score(profile, mei_external_uri):
         return
 
     try:
-        get_pod_listing(provider, profile, storage)
+        get_pod_listing(cl, provider, profile, storage)
     except urllib.error.HTTPError as e:
         if e.status == 404:
             create_clara_container(provider, profile, storage)
 
-    r = requests.get(mei_external_uri)
-    r.raise_for_status()
-    payload = r.text
+    try:
+        headers = {"User-Agent": "Clara (https://github.com/trompamusic/clara)"}
+        r = requests.get(mei_external_uri, headers=headers, timeout=10)
+        r.raise_for_status()
+        mei_text = r.text
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading MEI file: {e}")
+        raise SolidError(f"Error downloading MEI file: {e}")
 
-    is_valid = mei_is_valid(payload)
+    is_valid = mei_is_valid(mei_text)
     if not is_valid:
-        raise SolidError("MEI file is not valid")
+        raise SolidError("MEI file is not valid XML")
 
     filename = os.path.basename(mei_external_uri)
-    title = get_title_from_mei(payload, filename)
-    mei_copy_uri = upload_mei_to_pod(provider, profile, storage, payload)
+    title = get_title_from_mei(mei_text, filename)
+    mei_copy_uri = upload_mei_to_pod(cl, provider, profile, storage, mei_text)
 
-    return create_and_save_structure(provider, profile, storage, title, payload, mei_external_uri, mei_copy_uri)
+    return create_and_save_structure(cl, provider, profile, storage, title, mei_text, mei_external_uri, mei_copy_uri)
 
 
 @shared_task(ignore_result=False)

@@ -30,11 +30,12 @@ dependencies = [
     "sentry-sdk[flask]~=2.27.0",
     "solidauth-oidc",
     "sqlalchemy~=2.0.1",
-    "verovio~=3.14.0",
+    "verovio~=5.5.0",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest>=8.4.1",
     "ruff>=0.12.5",
 ]
 prod = [
