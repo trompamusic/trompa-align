@@ -7,10 +7,11 @@ from datetime import datetime
 from statistics import mean
 
 from lxml import etree as ET
-from rdflib import Graph, URIRef, RDF, SKOS
+from rdflib import Graph, URIRef, RDF, SKOS, Literal, BNode
+from rdflib.namespace import DCTERMS
 from pyld import jsonld
 
-from scripts.namespace import MO
+from scripts.namespace import MO, MELD
 
 
 def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, includePerformance):
@@ -65,7 +66,6 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
 <#t{uuid}> oa:hasScope <{tlUri}> ;
     oa:hasSource {embodiment_id} .\n""".format(
                 uuid=unique_num,
-                xml_id=obs["xml_id"][ix3],
                 embodiment_id=obs["xml_id"][ix3].replace("trompa-align_", "maps:")
                 if obs["xml_id"][ix3].startswith("trompa-align_inserted_")
                 else "meiUri:" + obs["xml_id"][ix3],
@@ -127,7 +127,7 @@ def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
 @prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
 @prefix mo: <http://purl.org/ontology/mo/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
-    
+
     <{performance_uri}> a mo:Performance ;
       mo:performance_of <{score_uri}> ;
       mo:recorded_as <{performance_uri}#Signal> ;
@@ -216,25 +216,64 @@ def generate_structural_segmentation(meiFile):
     return first_note_per_section
 
 
-def score_to_graph(score_uri, seg_uri, performance_resource, mei_uri, mei_copy_uri, title):
-    rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
-    @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-    @prefix dcterms: <http://purl.org/dc/terms/> .
-    @prefix meld: <https://meld.linkedmusic.org/terms/> .
-
-    <{mei_uri}> a mo:PublishedScore .
-
-    <{score_uri}> a mo:Score ;
-        mo:published_as <{mei_uri}> ;
-        dcterms:title "{title}" ;
-        meld:segments <{seg_uri}> .
+def score_to_graph(score_uri, seg_uri, performance_resource, mei_uri, mei_copy_uri, title, expansions=None) -> Graph:
     """
-    graph = Graph().parse(data=rdf, format="n3")
+    Generate an RDF graph for a score using pure rdflib approach.
+
+    This function creates RDF triples describing a musical score and its relationships
+    to MEI files, performances, and expansions.
+
+    Args:
+        score_uri: URI of the score
+        seg_uri: URI of the score segments
+        performance_resource: URI of the related performance
+        mei_uri: URI of the MEI file
+        mei_copy_uri: URI of the MEI copy
+        title: Title of the score
+        expansions: Optional dict mapping expansion IDs to note counts
+
+    Returns:
+        rdflib.Graph: RDF graph containing the score description
+    """
+
+    graph = Graph()
+
+    # Bind namespaces for better readability in serialized output
+    graph.bind("mo", MO)
+    graph.bind("meld", MELD)
+    graph.bind("dcterms", DCTERMS)
+    graph.bind("skos", SKOS)
+
+    # Convert string URIs to URIRef objects
+    score_uri_ref = URIRef(score_uri)
+    seg_uri_ref = URIRef(seg_uri)
+    performance_resource_ref = URIRef(performance_resource)
+    mei_uri_ref = URIRef(mei_uri)
     mei_copy_uri_ref = URIRef(mei_copy_uri)
-    graph.add((URIRef(score_uri), SKOS.related, URIRef(performance_resource)))
+    title_literal = Literal(title)
+
+    # core score triples
+    graph.add((mei_uri_ref, RDF.type, MO.PublishedScore))
+    graph.add((score_uri_ref, RDF.type, MO.Score))
+    graph.add((score_uri_ref, MO.published_as, mei_uri_ref))
+    graph.add((score_uri_ref, DCTERMS.title, title_literal))
+    graph.add((score_uri_ref, MELD.segments, seg_uri_ref))
+
+    # Expansions
+    if expansions:
+        for expansion_id, count in expansions.items():
+            graph.add((score_uri_ref, MELD.expansion, Literal(expansion_id)))
+            # Create a blank node for the expansion note count structure
+            blank_node = BNode()
+            graph.add((score_uri_ref, MELD.expansionNoteCount, blank_node))
+            graph.add((blank_node, MELD.expansionId, Literal(expansion_id)))
+            graph.add((blank_node, MELD.noteCount, Literal(count)))
+
+    # Additional relationships
+    graph.add((score_uri_ref, SKOS.related, performance_resource_ref))
     graph.add((mei_copy_uri_ref, RDF.type, MO.PublishedScore))
-    graph.add((mei_copy_uri_ref, SKOS.exactMatch, URIRef(mei_uri)))
+    graph.add((mei_copy_uri_ref, SKOS.exactMatch, mei_uri_ref))
+
     return graph
 
 
