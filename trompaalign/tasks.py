@@ -123,10 +123,13 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         print("Cannot find storage, quitting")
         return
 
+    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
 
     with tempfile.TemporaryDirectory() as td:
-        score = get_resource_from_pod(provider, profile, score_url)
+        score = get_resource_from_pod(cl, provider, profile, score_url)
         graph = rdflib.Graph()
         graph.parse(data=score, format="n3")
         # e.g., find all triples where `<someuri> a mo:score`
@@ -156,7 +159,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
                 f"Cannot find location of performance container given the score resource {score_url}"
             )
 
-        mei_content = get_resource_from_pod(provider, profile, external_mei_url)
+        mei_content = get_resource_from_pod(cl, provider, profile, external_mei_url)
 
         mei_file = os.path.join(td, "score.mei")
         with open(mei_file, "wb") as fp:
@@ -164,14 +167,14 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
 
         if webmidi_url is not None:
             print("Converting webmidi to midi and uploading")
-            webmidi = get_resource_from_pod(provider, profile, webmidi_url)
+            webmidi = get_resource_from_pod(cl, provider, profile, webmidi_url)
             midi = midi_json_to_midi(json.loads(webmidi.decode("utf-8")))
             midi_file = os.path.join(td, "performance.mid")
             midi.save(midi_file)
-            midi_url = upload_midi_to_pod(provider, profile, storage, open(midi_file, "rb").read())
+            midi_url = upload_midi_to_pod(cl, provider, profile, storage, open(midi_file, "rb").read())
         else:
             print("only got a midi URL, using it directly")
-            midi_contents = get_resource_from_pod(provider, profile, midi_url)
+            midi_contents = get_resource_from_pod(cl, provider, profile, midi_url)
             midi_file = os.path.join(td, "performance.mid")
             with open(midi_file, "wb") as fp:
                 fp.write(midi_contents)
@@ -200,7 +203,9 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         print(f"Timeline resource: {timeline_resource}")
 
         audio_resource = os.path.join(audio_container, audio_fname)
-        mp3_uri = upload_mp3_to_pod(provider, profile, audio_resource, open(os.path.join(td, audio_fname), "rb").read())
+        mp3_uri = upload_mp3_to_pod(
+            cl, provider, profile, audio_resource, open(os.path.join(td, audio_fname), "rb").read()
+        )
 
         # Add triples for Signal->Midi and Midi->webmidi
         performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))
@@ -214,7 +219,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         performance_document = graph_to_turtle(performance_graph)
         timeline_document = graph_to_jsonld(timeline_graph, mei_uri=external_mei_url, tl_uri=timeline_resource)
 
-        save_performance_manifest(provider, profile, performance_resource, performance_document)
-        save_performance_timeline(provider, profile, timeline_resource, timeline_document)
+        save_performance_manifest(cl, provider, profile, performance_resource, performance_document)
+        save_performance_timeline(cl, provider, profile, timeline_resource, timeline_document)
 
     return True

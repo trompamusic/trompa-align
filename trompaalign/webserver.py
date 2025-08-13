@@ -305,13 +305,15 @@ def align():
 
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
+    use_client_id_document = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
+    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=use_client_id_document)
 
     print("Uploading file")
     if midi_type == "webmidi":
-        webmidi_url = upload_webmidi_to_pod(provider, profile, storage, payload)
+        webmidi_url = upload_webmidi_to_pod(cl, provider, profile, storage, payload)
         midi_url = None
     elif midi_type == "midi":
-        midi_url = upload_midi_to_pod(provider, profile, storage, payload)
+        midi_url = upload_midi_to_pod(cl, provider, profile, storage, payload)
         webmidi_url = None
     else:
         return jsonify({"status": "error", "message": "Must have midi_type of webmidi or midi"}), 400
