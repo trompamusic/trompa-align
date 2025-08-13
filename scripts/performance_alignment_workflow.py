@@ -124,7 +124,7 @@ def perform_workflow(
     validate_alignment_outputs(r_output, py_output)
 
     # Use the Python output as the final result
-    os.rename(py_output, os.path.join(tempdir, "maps.json"))
+    os.rename(r_output, os.path.join(tempdir, "maps.json"))
 
     print("** Performing AUDIO SYNTHESIS")
     midi_to_mp3(performance_midi, os.path.join(tempdir, audio_fname), tempdir)
