@@ -7,8 +7,9 @@ SQLALCHEMY_DATABASE_URI = os.getenv("TR_ALIGN_SQLALCHEMY_DATABASE_URI")
 
 BASE_URL = os.getenv("TR_ALIGN_BASE_URL")
 REDIRECT_URL = os.path.join(BASE_URL, "auth/callback")
+REDIRECT_URL_BACKEND = os.path.join(BASE_URL, "api/auth/callback-backend")
 # When deployed on production, we can redirect to the react app (base url), or /api/auth/callback (API)
-REDIRECT_URLS = [REDIRECT_URL, BASE_URL]
+REDIRECT_URLS = [REDIRECT_URL, BASE_URL, REDIRECT_URL_BACKEND]
 
 # When accessing an OP, should you register a client ID ahead of time, or submit a URL?
 #  if the OP doesn't support client registration, it'll always submit a URL

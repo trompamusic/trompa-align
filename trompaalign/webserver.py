@@ -5,7 +5,7 @@ import flask
 import sentry_sdk
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import current_app, jsonify, request
+from flask import current_app, jsonify, redirect, request
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client
@@ -128,6 +128,26 @@ def clara_jsonld():
     return response
 
 
+@webserver_bp.route("/clara-backend.jsonld")
+def clara_backend_jsonld():
+    # In Solid-OIDC you can register a client by having the "client_id" field be a URL to a json-ld document
+    # It's normally recommended that this is a static file, but for simplicity serve it from flask
+
+    baseurl = current_app.config["BASE_URL"]
+    if not baseurl.endswith("/"):
+        baseurl += "/"
+
+    client_information = {
+        "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
+        "client_id": baseurl + "clara-backend.jsonld",
+        **current_app.config["CLIENT_REGISTRATION_DATA"],
+    }
+
+    response = jsonify(client_information)
+    response.content_type = "application/ld+json"
+    return response
+
+
 @webserver_bp.route("/api/auth/request", methods=["POST"])
 def auth_request():
     webid = request.form.get("webid_or_provider")
@@ -135,7 +155,7 @@ def auth_request():
 
     # This redirect URL is the react app: It will receive the code and state, and then perform an API request
     # to /api/auth/callback
-    redirect_url = flask.current_app.config["REDIRECT_URL"]
+    redirect_url = flask.current_app.config["REDIRECT_URL_BACKEND"]
     client_id_document_url = get_client_id_document_url_if_configured()
 
     use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
@@ -178,6 +198,44 @@ def auth_callback():
     cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
     success, data = cl.authentication_callback(auth_code, state, provider, redirect_url, client_id_document_url)
     return jsonify({"status": success, "data": data})
+
+
+@webserver_bp.route("/api/auth/callback-backend", methods=["GET"])
+def auth_callback_backend():
+    print(flask.request.args)
+    auth_code = flask.request.args.get("code")
+    state = flask.request.args.get("state")
+
+    provider = flask.request.args.get("iss")
+    if not provider and "provider" in flask.session:
+        provider = flask.session["provider"]
+    if not provider:
+        print("No provider found in session or args")
+        return "No provider found", 400
+
+    redirect_url = flask.current_app.config["REDIRECT_URL_BACKEND"]
+    client_id_document_url = get_client_id_document_url_if_configured()
+    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
+    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
+    success, data = cl.authentication_callback(auth_code, state, provider, redirect_url, client_id_document_url)
+
+    print("AUTH CALLBACK BACKEND")
+    print("auth_code", auth_code)
+    print("state", state)
+    print("provider", provider)
+    print("redirect_url", redirect_url)
+    print("client_id_document_url", client_id_document_url)
+    print("success", success)
+
+    redirect_after = flask.session.get("redirect_after")
+    print("redirect_after", redirect_after)
+
+    if success and redirect_after:
+        return redirect(redirect_after)
+    elif success:
+        return redirect("/")
+    else:
+        return "Error when doing callback", 500
 
 
 @webserver_bp.route("/api/check_user_perms")
