@@ -270,6 +270,8 @@ def add_score_status():
             return jsonify({"status": "error", "error": str(result.result)})
         else:
             # An unknown failure mode
+            print("Unknown failure mode", result.result)
+            print(result.traceback)
             sentry_sdk.capture_exception(result.result)
             return jsonify({"status": "unknown", "error": str(result.result)})
     else:
@@ -336,6 +338,9 @@ def align_status():
             return jsonify({"status": "error", "error": str(result.result)})
         else:
             # An unknown failure mode
+            print("Unknown failure mode", result.result)
+            print(result.traceback)
+            sentry_sdk.capture_exception(result.result)
             return jsonify({"status": "unknown", "error": str(result.result)})
     else:
         if result.ready():
