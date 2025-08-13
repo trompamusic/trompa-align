@@ -35,6 +35,8 @@ services:
       - -A
       - trompaalign.celery
       - worker
+      - --concurrency=1
+      - --loglevel=INFO
     env_file:
       - env.docker
     volumes:
