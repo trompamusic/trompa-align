@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import urlparse
 
 import click
 import requests
@@ -416,8 +417,9 @@ def add_turtle(profile, resource, file, use_client_id_document):
 @cli.command("get-file")
 @click.argument("profile")
 @click.argument("resource")
+@click.option("--save", is_flag=True, help="Save to local file (basename of resource)")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def get_file(profile, resource, use_client_id_document):
+def get_file(profile, resource, save, use_client_id_document):
     """Get any file from a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -432,7 +434,15 @@ def get_file(profile, resource, use_client_id_document):
     cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     r = requests.get(resource, headers=headers)
-    print(r.text)
+    r.raise_for_status()
+    if save:
+        parsed = urlparse(resource)
+        filename = os.path.basename(parsed.path) or "index"
+        with open(filename, "wb") as f:
+            f.write(r.content)
+        print(f"Saved to {filename}")
+    else:
+        print(r.text)
 
 
 @cli.command("options")
