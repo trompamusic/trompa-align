@@ -3,7 +3,6 @@ import os
 
 import click
 import requests
-import requests.utils
 from trompaalign.extensions import db, backend
 from flask.cli import AppGroup
 from solidauth import client
@@ -26,6 +25,7 @@ from trompaalign.solid import (
     upload_midi_to_pod,
     upload_webmidi_to_pod,
 )
+from trompaalign import batch_upload
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -471,3 +471,46 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
         midi_url = None
         webmidi_url = midi_url
     align_recording(profile, score_url, webmidi_url, midi_url)
+
+
+@cli.command("recursive-upload-directory")
+@click.argument("profile")
+@click.argument("local_directory", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.argument("remote_uri")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+@click.option("--debug", is_flag=True, help="Debug mode: show what would be uploaded without actually uploading")
+def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_client_id_document, debug):
+    """Recursively upload a local directory to a Solid pod.
+
+    This command will:
+    - Create LDP containers for directories (only if they contain files)
+    - Upload all files with appropriate content-types
+    - Handle special filename patterns (files ending with $.ext)
+    - Set content-type to text/xml for .xml files and text/turtle for .ttl files
+
+    Use --debug to see what would be uploaded without actually performing the upload.
+    """
+    if debug:
+        print(f"DEBUG: Analyzing directory {local_directory} for upload to {remote_uri}")
+        print("DEBUG: Skipping profile validation in debug mode")
+        # In debug mode, we don't need to validate the profile or create a client
+        # We'll create a mock client just to pass to the function
+        cl = None
+        provider = "debug-provider"
+        profile = profile
+    else:
+        print(f"Looking up data for profile {profile}")
+        provider = lookup_provider_from_profile(profile)
+        if not provider:
+            print("Cannot find provider, quitting")
+            return
+        print(f"Uploading directory {local_directory} to {remote_uri}")
+        cl = client.SolidClient(backend.backend, use_client_id_document)
+
+    try:
+        batch_upload.recursive_upload_directory(cl, provider, profile, local_directory, remote_uri, debug=debug)
+        if not debug:
+            print("Upload completed successfully")
+    except Exception as e:
+        print(f"Upload failed: {e}")
+        raise
