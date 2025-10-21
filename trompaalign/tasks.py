@@ -22,6 +22,7 @@ from trompaalign.solid import (
     SolidError,
     create_and_save_structure,
     create_clara_container,
+    score_already_exists_in_list,
     get_pod_listing,
     get_resource_from_pod,
     get_storage_from_profile,
@@ -82,6 +83,15 @@ def add_score(profile, mei_external_uri):
     except urllib.error.HTTPError as e:
         if e.status == 404:
             create_clara_container(provider, profile, storage)
+
+    # Early exit if the score already exists in mapping
+    try:
+        if score_already_exists_in_list(cl, provider, profile, storage, mei_external_uri):
+            print("Score already present in mapping; returning without changes")
+            return None
+    except Exception:
+        # Non-fatal: continue with normal flow
+        pass
 
     try:
         headers = {"User-Agent": "Clara (https://github.com/trompamusic/clara)"}

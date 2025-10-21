@@ -11,6 +11,7 @@ from solidauth.db import Base
 
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
+    add_score_to_mapping,
     create_and_save_structure,
     create_clara_container,
     find_score_for_external_uri,
@@ -484,6 +485,34 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
         midi_url = None
         webmidi_url = midi_url
     align_recording(profile, score_url, webmidi_url, midi_url)
+
+
+@cli.command("add-score-to-mapping")
+@click.argument("profile")
+@click.argument("score_url")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_add_score_to_mapping(profile, score_url, use_client_id_document):
+    """Add a score to the score mapping"""
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+    storage = get_storage_from_profile(profile)
+    if not storage:
+        print("Cannot find storage, quitting")
+        return
+
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    try:
+        added = add_score_to_mapping(cl, provider, profile, storage, score_url)
+        if added:
+            print(f"Added {score_url} to scores mapping")
+        else:
+            print(f"Score {score_url} already exists in mapping")
+    except requests.HTTPError as e:
+        print(f"Failed to update mapping: {e}")
+        if e.response is not None:
+            print(e.response.text)
 
 
 @cli.command("recursive-upload-directory")

@@ -6,7 +6,8 @@ import uuid
 from urllib.error import HTTPError
 
 import rdflib
-from rdflib.namespace import RDF
+from rdflib.namespace import RDF, SDO
+from rdflib.term import Literal
 import requests
 import requests.utils
 from pyld import jsonld
@@ -491,6 +492,84 @@ def find_score_for_external_uri(solid_client, provider, profile, storage, mei_ex
             return item
 
 
+def _get_empty_score_mapping_graph(score_data_resource):
+    graph = rdflib.Graph()
+    graph.add((URIRef(score_data_resource), RDF.type, SDO.ItemList))
+    graph.add((URIRef(score_data_resource), SDO.name, Literal("Scores in this user's CLARA instance")))
+    return graph
+
+
+def _get_score_mapping(solid_client, provider, profile, storage):
+    """Get the score mapping from the scores.ttl file.
+
+    Returns a tuple (graph, etag, resource_uri).
+    If the file doesn't exist, returns (empty_graph, None, resource_uri).
+    """
+    score_data_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", "scores.ttl")
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, score_data_resource, "GET")
+        headers["Accept"] = "text/turtle"
+        r = requests.get(score_data_resource, headers=headers)
+        r.raise_for_status()
+        etag = r.headers.get("ETag")
+        graph = rdflib.Graph()
+        graph.parse(data=r.text, format="n3")
+        return graph, etag, score_data_resource
+    except requests.exceptions.HTTPError as e:
+        print("expected error", e)
+        if e.response is not None and e.response.status_code == 404:
+            return _get_empty_score_mapping_graph(score_data_resource), None, score_data_resource
+        else:
+            raise e
+
+
+def _add_score_to_mapping(score_mapping_graph: rdflib.Graph, item_list_subject_uri: str, mei_external_uri: str):
+    """Add the external URL to the ItemList as a schema:itemListElement literal.
+
+    The ItemList subject is the `scores.ttl` resource URI, not the URL itself.
+    """
+    score_mapping_graph.add((URIRef(item_list_subject_uri), SDO.itemListElement, Literal(mei_external_uri)))
+    return score_mapping_graph
+
+
+def score_already_exists_in_list(solid_client, provider, profile, storage, mei_external_uri):
+    graph, _etag, _resource = _get_score_mapping(solid_client, provider, profile, storage)
+    matches = list(graph.triples((None, SDO.itemListElement, Literal(mei_external_uri))))
+    return len(matches) > 0
+
+
+def _update_and_save_score_mapping(solid_client, provider, profile, storage, mei_external_uri):
+    """Append a URL to the mapping and persist with ETag preconditions."""
+    graph, _etag_ignored, score_data_resource = _get_score_mapping(solid_client, provider, profile, storage)
+    graph = _add_score_to_mapping(graph, score_data_resource, mei_external_uri)
+
+    # Probe ETag using HEAD to set preconditions correctly
+    exists, etag = _head_for_etag(solid_client, provider, profile, score_data_resource)
+    ttl_bytes = graph.serialize(format="n3", encoding="utf-8")
+    _put_document_with_preconditions(
+        solid_client,
+        provider,
+        profile,
+        score_data_resource,
+        ttl_bytes,
+        "text/turtle",
+        exists,
+        etag,
+    )
+    print(f"Updated scores mapping at {score_data_resource}")
+
+
+def add_score_to_mapping(solid_client, provider, profile, storage, mei_external_uri) -> bool:
+    """Public helper to add a score URL to the mapping iff missing.
+
+    Returns True if added; False if it already existed.
+    """
+    if score_already_exists_in_list(solid_client, provider, profile, storage, mei_external_uri):
+        return False
+    _update_and_save_score_mapping(solid_client, provider, profile, storage, mei_external_uri)
+    return True
+
+
 def create_and_save_structure(
     solid_client, provider, profile, storage, title, mei_payload: str, mei_external_uri, mei_copy_uri
 ):
@@ -552,6 +631,16 @@ def create_and_save_structure(
     r = requests.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
     r.raise_for_status()
     print(r.text)
+
+    # Add the external MEI URL to the scores mapping, race-aware
+    try:
+        if score_already_exists_in_list(solid_client, provider, profile, storage, mei_external_uri):
+            print("Score already present in scores mapping; continuing")
+        else:
+            _update_and_save_score_mapping(solid_client, provider, profile, storage, mei_external_uri)
+    except SolidError as e:
+        # Mapping update conflict; surface but do not fail the creation process
+        print(f"Warning: could not update scores mapping: {e}")
 
     return score_resource
 
