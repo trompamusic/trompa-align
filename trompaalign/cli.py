@@ -22,6 +22,7 @@ from trompaalign.solid import (
     http_options,
     lookup_provider_from_profile,
     patch_container_item_title,
+    delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
     upload_mei_to_pod,
@@ -531,9 +532,10 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_cli
 @cli.command("set-permissions")
 @click.argument("profile")
 @click.argument("resource")
-@click.option("--public/--private", "is_public", required=True, help="Set resource ACL to public-read or private")
+@click.option("--public/--private", "is_public", default=None, help="Set resource ACL to public-read or private")
+@click.option("--remove", is_flag=True, help="Delete the ACL resource for the target")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_set_permissions(profile, resource, is_public, use_client_id_document):
+def cmd_set_permissions(profile, resource, is_public, remove, use_client_id_document):
     """Set ACL permissions of a resource to public-read or private.
 
     Public: owner Control/Read/Write, public Read
@@ -546,8 +548,20 @@ def cmd_set_permissions(profile, resource, is_public, use_client_id_document):
         return
 
     cl = client.SolidClient(backend.backend, use_client_id_document)
+
+    # Validate option combinations
+    if remove and is_public is not None:
+        print("Error: --remove is mutually exclusive with --public/--private")
+        return
+    if not remove and is_public is None:
+        print("Error: specify one of --public/--private or --remove")
+        return
+
     try:
-        if is_public:
+        if remove:
+            acl_uri = delete_acl_for_resource(cl, provider, profile, resource)
+            print(f"Deleted ACL: {acl_uri}")
+        elif is_public:
             acl_uri = set_resource_acl_public(cl, provider, profile, resource)
             print(f"Set resource public-read. ACL: {acl_uri}")
         else:

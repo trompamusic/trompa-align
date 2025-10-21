@@ -156,13 +156,63 @@ def _head_for_etag(solid_client, provider, profile, uri):
     return False, None
 
 
-def _build_acl_graph_private(resource_uri: str, profile_uri: str) -> rdflib.Graph:
-    """Owner-only Control/Read/Write."""
+def is_container_resource(solid_client, provider, profile, resource_uri: str) -> bool:
+    """Detect if the resource is an LDP Container by fetching its types.
+
+    We request JSON-LD and look for ldp:Container or ldp:BasicContainer types for the
+    node whose @id equals the resource URI. Falls back to trailing-slash heuristic
+    if the resource cannot be loaded as JSON-LD.
+    """
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "GET")
+        data, _ = get_uri_jsonld_or_none(resource_uri, headers)
+        if data is None:
+            logger.debug("is_container_resource: JSON-LD unavailable, fallback heuristic for %s", resource_uri)
+            return resource_uri.endswith("/")
+        compact = jsonld.compact(data, jsonld_context)
+        logger.debug("is_container_resource compacted: %s", compact)
+        candidates = []
+        if isinstance(compact, dict):
+            if "@graph" in compact and isinstance(compact["@graph"], list):
+                candidates = compact["@graph"]
+            else:
+                candidates = [compact]
+        for node in candidates:
+            node_id = node.get("@id")
+            if node_id != resource_uri:
+                continue
+            types = node.get("@type", [])
+            if not isinstance(types, list):
+                types = [types]
+            # Accept both compacted and full IRI forms
+            if any(
+                t
+                in (
+                    "ldp:Container",
+                    "ldp:BasicContainer",
+                    "http://www.w3.org/ns/ldp#Container",
+                    "http://www.w3.org/ns/ldp#BasicContainer",
+                )
+                for t in types
+            ):
+                logger.debug("Resource %s is an LDP Container (types=%s)", resource_uri, types)
+                return True
+        logger.debug("Resource %s is not detected as Container (types checked).", resource_uri)
+        return False
+    except Exception as e:
+        logger.debug("is_container_resource failed for %s: %s", resource_uri, e)
+        return resource_uri.endswith("/")
+
+
+def _build_acl_graph_private(resource_uri: str, profile_uri: str, is_container: bool) -> rdflib.Graph:
+    """Owner-only Control/Read/Write. For containers, also set acl:default."""
     ACL = rdflib.Namespace("http://www.w3.org/ns/auth/acl#")
     g = rdflib.Graph()
     auth = rdflib.BNode()
     g.add((auth, RDF.type, ACL.Authorization))
     g.add((auth, ACL.accessTo, URIRef(resource_uri)))
+    if is_container:
+        g.add((auth, ACL.default, URIRef(resource_uri)))
     g.add((auth, ACL.agent, URIRef(profile_uri)))
     g.add((auth, ACL.mode, ACL.Control))
     g.add((auth, ACL.mode, ACL.Read))
@@ -170,32 +220,49 @@ def _build_acl_graph_private(resource_uri: str, profile_uri: str) -> rdflib.Grap
     return g
 
 
-def _build_acl_graph_public(resource_uri: str, profile_uri: str) -> rdflib.Graph:
-    """Owner Control/Read/Write + Public Read."""
+def _build_acl_graph_public(resource_uri: str, profile_uri: str, is_container: bool) -> rdflib.Graph:
+    """Owner Control/Read/Write + Public Read. For containers, also set acl:default for both rules."""
     ACL = rdflib.Namespace("http://www.w3.org/ns/auth/acl#")
     FOAF = rdflib.Namespace("http://xmlns.com/foaf/0.1/")
-    g = _build_acl_graph_private(resource_uri, profile_uri)
+    g = _build_acl_graph_private(resource_uri, profile_uri, is_container)
     auth_public = rdflib.BNode()
     g.add((auth_public, RDF.type, ACL.Authorization))
     g.add((auth_public, ACL.accessTo, URIRef(resource_uri)))
+    if is_container:
+        g.add((auth_public, ACL.default, URIRef(resource_uri)))
     g.add((auth_public, ACL.agentClass, FOAF.Agent))
     g.add((auth_public, ACL.mode, ACL.Read))
     return g
 
 
-def _put_acl_document(
-    solid_client, provider, profile, acl_uri: str, ttl_bytes: bytes, existing: bool, etag: str | None
+def _put_document_with_preconditions(
+    solid_client,
+    provider,
+    profile,
+    resource_uri: str,
+    content_bytes: bytes,
+    content_type: str,
+    existing: bool,
+    etag: str | None,
+    extra_headers: dict | None = None,
 ):
-    headers = solid_client.get_bearer_for_user(provider, profile, acl_uri, "PUT")
-    headers["content-type"] = "text/turtle"
+    """PUT a document with ETag-based preconditions.
+
+    - If existing True and etag provided: send If-Match
+    - If existing False: send If-None-Match: *
+    - Sets Content-Type as provided; allows optional extra headers
+    """
+    headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "PUT")
+    headers["content-type"] = content_type
+    if extra_headers:
+        headers.update(extra_headers)
     if existing and etag:
         headers["If-Match"] = etag
     if not existing:
         headers["If-None-Match"] = "*"
-    r = requests.put(acl_uri, data=ttl_bytes, headers=headers)
-    # If ETag precondition fails, surface a helpful message
+    r = requests.put(resource_uri, data=content_bytes, headers=headers)
     if r.status_code == 412:
-        raise SolidError("ACL update failed due to precondition (ETag mismatch). Reload and retry.")
+        raise SolidError("Update failed due to precondition (ETag mismatch). Reload and retry.")
     r.raise_for_status()
     return r
 
@@ -204,9 +271,11 @@ def set_resource_acl_private(solid_client, provider, profile, resource_uri: str)
     """Set ACL to private (owner-only Control/Read/Write)."""
     acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
     exists, etag = _head_for_etag(solid_client, provider, profile, acl_uri)
-    g = _build_acl_graph_private(resource_uri, profile)
+    container = is_container_resource(solid_client, provider, profile, resource_uri)
+    logger.debug("Building private ACL for %s (container=%s)", resource_uri, container)
+    g = _build_acl_graph_private(resource_uri, profile, container)
     ttl = g.serialize(format="n3", encoding="utf-8")
-    _put_acl_document(solid_client, provider, profile, acl_uri, ttl, exists, etag)
+    _put_document_with_preconditions(solid_client, provider, profile, acl_uri, ttl, "text/turtle", exists, etag)
     return acl_uri
 
 
@@ -214,9 +283,28 @@ def set_resource_acl_public(solid_client, provider, profile, resource_uri: str):
     """Set ACL to public-read + owner Control/Read/Write."""
     acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
     exists, etag = _head_for_etag(solid_client, provider, profile, acl_uri)
-    g = _build_acl_graph_public(resource_uri, profile)
+    container = is_container_resource(solid_client, provider, profile, resource_uri)
+    logger.debug("Building public ACL for %s (container=%s)", resource_uri, container)
+    g = _build_acl_graph_public(resource_uri, profile, container)
     ttl = g.serialize(format="n3", encoding="utf-8")
-    _put_acl_document(solid_client, provider, profile, acl_uri, ttl, exists, etag)
+    _put_document_with_preconditions(solid_client, provider, profile, acl_uri, ttl, "text/turtle", exists, etag)
+    return acl_uri
+
+
+def delete_acl_for_resource(solid_client, provider, profile, resource_uri: str):
+    """Delete the ACL resource for a given resource using ETag preconditions."""
+    acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
+    exists, etag = _head_for_etag(solid_client, provider, profile, acl_uri)
+    if not exists:
+        logger.debug("ACL does not exist for %s (uri=%s)", resource_uri, acl_uri)
+        return acl_uri
+    headers = solid_client.get_bearer_for_user(provider, profile, acl_uri, "DELETE")
+    if etag:
+        headers["If-Match"] = etag
+    r = requests.delete(acl_uri, headers=headers)
+    if r.status_code == 412:
+        raise SolidError("ACL delete failed due to precondition (ETag mismatch). Reload and retry.")
+    r.raise_for_status()
     return acl_uri
 
 
