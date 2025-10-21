@@ -11,6 +11,62 @@ import requests
 from solidauth import client
 
 
+def is_lock_expired_response(resp: requests.Response) -> bool:
+    """Detect SolidCommunity lock timeout error responses.
+
+    Looks for a JSON body like:
+      {"statusCode":500, "message":"Lock expired after ..."}
+    Falls back to substring search in text body.
+    We've seen that solidcommunity.net returns a 500 error with a lock expired message if it takes more than 6 seconds
+    to process the upload, however the file still appears to be uploaded and created successfully.
+    """
+    try:
+        data = resp.json()
+        if data.get("statusCode") == 500 and isinstance(data.get("message"), str):
+            if "Lock expired" in data.get("message"):
+                return True
+    except Exception:
+        pass
+    try:
+        return "Lock expired after" in (resp.text or "")
+    except Exception:
+        return False
+
+
+def _with_trailing_slash(uri: str) -> str:
+    return uri if uri.endswith("/") else uri + "/"
+
+
+def container_exists(solid_client: client.SolidClient, provider: str, profile: str, container_uri: str) -> bool:
+    """Return True if the LDP container exists, False if not.
+
+    Tries HEAD first, then falls back to GET with Accept: text/turtle.
+    """
+    uri = _with_trailing_slash(container_uri)
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
+        r = requests.head(uri, headers=headers)
+        if r.status_code == 404:
+            return False
+        if r.ok:
+            return True
+    except Exception:
+        pass
+
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
+        headers.update({"Accept": "text/turtle"})
+        r = requests.get(uri, headers=headers)
+        if r.status_code == 404:
+            return False
+        if r.ok:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
 def create_ldp_container(solid_client: client.SolidClient, provider: str, profile: str, container_uri: str):
     """
     Create an LDP container using rdflib instead of raw JSON.
@@ -48,8 +104,16 @@ def create_ldp_container(solid_client: client.SolidClient, provider: str, profil
     if r.status_code == 201:
         print(f"Successfully created container: {container_uri}")
     else:
-        print(f"Unexpected status code: {r.status_code}: {r.text}")
-        r.raise_for_status()
+        # Treat SolidCommunity lock timeout as success
+        try:
+            r.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if is_lock_expired_response(r):
+                print(f"Warning: provider lock timeout, treating container create as success for {container_uri}")
+            else:
+                print(f"Unexpected status creating container {container_uri}: {e}")
+                print(f"Response: {r.text}")
+                raise
 
 
 def get_content_type(file_path: str) -> Optional[str]:
@@ -76,6 +140,8 @@ def get_content_type(file_path: str) -> Optional[str]:
                 return "text/turtle"
             # For other extensions, return None (omit content-type)
             return None
+    if filename.endswith(".jsonld"):
+        return "application/ld+json"
 
     # For regular files, use mimetypes
     content_type, _ = mimetypes.guess_type(file_path)
@@ -125,7 +191,15 @@ def upload_file_to_pod(
         headers["content-type"] = content_type
 
     r = requests.put(remote_uri, data=content, headers=headers)
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if is_lock_expired_response(r):
+            print(f"Warning: provider lock timeout, treating as success for {remote_uri}")
+        else:
+            print(f"Error uploading {remote_uri}: {e}")
+            print(f"Response: {r.text}")
+            raise
     print(f"Uploaded: {remote_uri}")
 
 
@@ -210,7 +284,8 @@ def recursive_upload_directory(
         # Create directories first (in order)
         sorted_dirs = sorted(dirs_to_create)
         for dir_uri in sorted_dirs:
-            create_ldp_container(solid_client, provider, profile, dir_uri)
+            if not container_exists(solid_client, provider, profile, dir_uri):
+                create_ldp_container(solid_client, provider, profile, dir_uri)
 
         # Upload files
         for local_file_path, remote_file_uri in files_to_upload:
