@@ -6,6 +6,7 @@ import uuid
 from urllib.error import HTTPError
 
 import rdflib
+from rdflib.namespace import RDF
 import requests
 import requests.utils
 from pyld import jsonld
@@ -56,6 +57,167 @@ def get_pod_listing(solid_client, provider, profile, storage):
 def get_pod_listing_ttl(solid_client, provider, profile, storage):
     headers = solid_client.get_bearer_for_user(provider, profile, storage, "GET")
     return get_uri_ttl(storage, headers)
+
+
+def _parse_acl_link_from_headers(headers):
+    """Return ACL URI from Link headers if present, else None."""
+    links = headers.get("Link")
+    logger.debug("Parsing Link header for ACL: %s", links)
+    if not links:
+        return None
+    try:
+        parsed_links = requests.utils.parse_header_links(links)
+    except Exception:
+        logger.debug("Failed to parse Link headers")
+        return None
+    for l in parsed_links:
+        rel = l.get("rel")
+        if rel == "acl":
+            acl_url = l.get("url")
+            logger.debug("Found ACL link: %s", acl_url)
+            return acl_url
+    return None
+
+
+def discover_acl_uri(solid_client, provider, profile, resource_uri):
+    """Discover the ACL resource URI for a given resource.
+
+    Strategy:
+    1) HEAD or OPTIONS the resource and parse Link: <...>; rel="acl"
+    2) Fallback to appending ".acl" (works on many Solid servers for both resources and containers)
+    """
+    logger.debug("Discovering ACL URI for resource: %s", resource_uri)
+    # Try HEAD first
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "HEAD")
+        logger.debug("HEAD %s with headers: %s", resource_uri, headers)
+        r = requests.head(resource_uri, headers=headers)
+        # Some servers may not allow HEAD; ignore failures and try OPTIONS
+        logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
+        if r.ok:
+            acl_from_head = _parse_acl_link_from_headers(r.headers)
+            if acl_from_head:
+                return acl_from_head
+    except Exception:
+        logger.debug("HEAD attempt failed for %s", resource_uri)
+        pass
+
+    # Try OPTIONS
+    try:
+        headers, _ = http_options(solid_client, provider, profile, resource_uri)
+        logger.debug("OPTIONS headers: %s", headers)
+        acl_from_options = _parse_acl_link_from_headers(headers)
+        if acl_from_options:
+            return acl_from_options
+    except Exception:
+        logger.debug("OPTIONS attempt failed for %s", resource_uri)
+        pass
+
+    # Fallback heuristic: append .acl
+    if resource_uri.endswith("/"):
+        acl_fallback = resource_uri + ".acl"
+        logger.debug("ACL discovery fallback (container): %s", acl_fallback)
+        return acl_fallback
+    acl_fallback = resource_uri + ".acl"
+    logger.debug("ACL discovery fallback (resource): %s", acl_fallback)
+    return acl_fallback
+
+
+def _head_for_etag(solid_client, provider, profile, uri):
+    """Return (exists: bool, etag: Optional[str])."""
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
+        logger.debug("Probing ETag via HEAD %s with headers: %s", uri, headers)
+        r = requests.head(uri, headers=headers)
+        logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
+        if r.status_code == 404:
+            logger.debug("HEAD indicates ACL does not exist: %s", uri)
+            return False, None
+        if r.ok:
+            etag = r.headers.get("ETag")
+            logger.debug("HEAD found ETag: %s", etag)
+            return True, etag
+    except Exception:
+        # As a fallback, try GET to infer existence and ETag
+        try:
+            headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
+            headers.update({"Accept": "text/turtle"})
+            logger.debug("Probing ETag via GET %s with headers: %s", uri, headers)
+            r = requests.get(uri, headers=headers)
+            logger.debug("GET status: %s, headers: %s", r.status_code, r.headers)
+            if r.status_code == 404:
+                return False, None
+            if r.ok:
+                etag = r.headers.get("ETag")
+                logger.debug("GET found ETag: %s", etag)
+                return True, etag
+        except Exception:
+            pass
+    return False, None
+
+
+def _build_acl_graph_private(resource_uri: str, profile_uri: str) -> rdflib.Graph:
+    """Owner-only Control/Read/Write."""
+    ACL = rdflib.Namespace("http://www.w3.org/ns/auth/acl#")
+    g = rdflib.Graph()
+    auth = rdflib.BNode()
+    g.add((auth, RDF.type, ACL.Authorization))
+    g.add((auth, ACL.accessTo, URIRef(resource_uri)))
+    g.add((auth, ACL.agent, URIRef(profile_uri)))
+    g.add((auth, ACL.mode, ACL.Control))
+    g.add((auth, ACL.mode, ACL.Read))
+    g.add((auth, ACL.mode, ACL.Write))
+    return g
+
+
+def _build_acl_graph_public(resource_uri: str, profile_uri: str) -> rdflib.Graph:
+    """Owner Control/Read/Write + Public Read."""
+    ACL = rdflib.Namespace("http://www.w3.org/ns/auth/acl#")
+    FOAF = rdflib.Namespace("http://xmlns.com/foaf/0.1/")
+    g = _build_acl_graph_private(resource_uri, profile_uri)
+    auth_public = rdflib.BNode()
+    g.add((auth_public, RDF.type, ACL.Authorization))
+    g.add((auth_public, ACL.accessTo, URIRef(resource_uri)))
+    g.add((auth_public, ACL.agentClass, FOAF.Agent))
+    g.add((auth_public, ACL.mode, ACL.Read))
+    return g
+
+
+def _put_acl_document(
+    solid_client, provider, profile, acl_uri: str, ttl_bytes: bytes, existing: bool, etag: str | None
+):
+    headers = solid_client.get_bearer_for_user(provider, profile, acl_uri, "PUT")
+    headers["content-type"] = "text/turtle"
+    if existing and etag:
+        headers["If-Match"] = etag
+    if not existing:
+        headers["If-None-Match"] = "*"
+    r = requests.put(acl_uri, data=ttl_bytes, headers=headers)
+    # If ETag precondition fails, surface a helpful message
+    if r.status_code == 412:
+        raise SolidError("ACL update failed due to precondition (ETag mismatch). Reload and retry.")
+    r.raise_for_status()
+    return r
+
+
+def set_resource_acl_private(solid_client, provider, profile, resource_uri: str):
+    """Set ACL to private (owner-only Control/Read/Write)."""
+    acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
+    exists, etag = _head_for_etag(solid_client, provider, profile, acl_uri)
+    g = _build_acl_graph_private(resource_uri, profile)
+    ttl = g.serialize(format="n3", encoding="utf-8")
+    _put_acl_document(solid_client, provider, profile, acl_uri, ttl, exists, etag)
+    return acl_uri
+
+
+def set_resource_acl_public(solid_client, provider, profile, resource_uri: str):
+    """Set ACL to public-read + owner Control/Read/Write."""
+    acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
+    exists, etag = _head_for_etag(solid_client, provider, profile, acl_uri)
+    g = _build_acl_graph_public(resource_uri, profile)
+    ttl = g.serialize(format="n3", encoding="utf-8")
+    _put_acl_document(solid_client, provider, profile, acl_uri, ttl, exists, etag)
+    return acl_uri
 
 
 def patch_container_item_title(solid_client, provider, profile, container, item, title):

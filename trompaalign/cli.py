@@ -21,6 +21,8 @@ from trompaalign.solid import (
     http_options,
     lookup_provider_from_profile,
     patch_container_item_title,
+    set_resource_acl_private,
+    set_resource_acl_public,
     upload_mei_to_pod,
     upload_midi_to_pod,
     upload_webmidi_to_pod,
@@ -514,3 +516,36 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_cli
     except Exception as e:
         print(f"Upload failed: {e}")
         raise
+
+
+@cli.command("set-permissions")
+@click.argument("profile")
+@click.argument("resource")
+@click.option("--public/--private", "is_public", required=True, help="Set resource ACL to public-read or private")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_set_permissions(profile, resource, is_public, use_client_id_document):
+    """Set ACL permissions of a resource to public-read or private.
+
+    Public: owner Control/Read/Write, public Read
+    Private: owner Control/Read/Write
+    """
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    try:
+        if is_public:
+            acl_uri = set_resource_acl_public(cl, provider, profile, resource)
+            print(f"Set resource public-read. ACL: {acl_uri}")
+        else:
+            acl_uri = set_resource_acl_private(cl, provider, profile, resource)
+            print(f"Set resource private. ACL: {acl_uri}")
+    except requests.HTTPError as e:
+        print(f"ACL update failed: {e}")
+        if e.response is not None:
+            print(e.response.text)
+    except Exception as e:
+        print(f"ACL update failed: {e}")
