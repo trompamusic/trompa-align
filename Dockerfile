@@ -5,6 +5,8 @@ ENV UV_LINK_MODE=copy \
   UV_PYTHON_DOWNLOADS=never \
   UV_NO_SYNC=1
 
+ENV PYTHONUNBUFFERED=1
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 #install dependencies (R, python, wget, unzip)
