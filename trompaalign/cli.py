@@ -15,6 +15,7 @@ from trompaalign.solid import (
     create_and_save_structure,
     create_clara_container,
     find_score_for_external_uri,
+    list_external_score_urls,
     get_contents_of_container,
     get_pod_listing,
     get_pod_listing_ttl,
@@ -26,6 +27,7 @@ from trompaalign.solid import (
     delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
+    update_score_mapping_bulk,
     upload_mei_to_pod,
     upload_midi_to_pod,
     upload_webmidi_to_pod,
@@ -513,6 +515,34 @@ def cmd_add_score_to_mapping(profile, score_url, use_client_id_document):
         print(f"Failed to update mapping: {e}")
         if e.response is not None:
             print(e.response.text)
+
+
+@cli.command("update-score-list")
+@click.argument("profile")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_update_score_list(profile, use_client_id_document):
+    """Scan the user's scores/ container and update the scores mapping with public URLs.
+
+    Reads all score description resources in the Clara scores container, extracts mo:published_as URLs,
+    deduplicates them, and writes them into the scores.ttl mapping in a single update.
+    """
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+    storage = get_storage_from_profile(profile)
+    if not storage:
+        print("Cannot find storage, quitting")
+        return
+
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    urls = list_external_score_urls(cl, provider, profile, storage)
+    if not urls:
+        print("No external score URLs found in scores/ container")
+        return
+    added, total = update_score_mapping_bulk(cl, provider, profile, storage, urls)
+    print(f"Found {len(urls)} external URLs; added {added}; total in mapping now {total}")
 
 
 @cli.command("recursive-upload-directory")
