@@ -226,6 +226,7 @@ def auth_callback_backend():
     print("redirect_url", redirect_url)
     print("client_id_document_url", client_id_document_url)
     print("success", success)
+    print("data", data)
 
     redirect_after = flask.session.get("redirect_after")
     print("redirect_after", redirect_after)
