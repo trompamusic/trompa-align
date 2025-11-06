@@ -13,7 +13,7 @@ The result of this reconciliation is stored in the MAPS output format, from wher
 Further documentation to come -- ***below notes are provisional and not necessarily suitable for public consumption!*** For futher information contact weigl at mdw.ac.at
 
 ## Setup
-It's easier to run the app in Docker, as there is a component which requires R, and some 
+It's easier to run the app in Docker, as there is a component which requires R, and some
 other external software. Building this is taken care of automatically by the Dockerfile.
 
     docker compose build web
@@ -28,8 +28,8 @@ If you're running in docker, most of these options don't need to be changed.
 In order to provide a seamless experience to users, we take advantage of Solid [Client ID Documents](https://solidproject.org/TR/oidc#clientids-document). This means that there must be a public URL pointing to
 the client id document. This document is served at http://localhost:8000/clara.jsonld
 
-Public SOLID servers must be able to load this document from the internet, so for local development you will 
-need a tunnel service such as ngrok. The free version is sufficient, but requires separate configuration 
+Public SOLID servers must be able to load this document from the internet, so for local development you will
+need a tunnel service such as ngrok. The free version is sufficient, but requires separate configuration
 each time that you run it. Run:
 
     ngrok http 8000
@@ -45,7 +45,7 @@ Update `.env` to include
     CLIENT_ID_DOCUMENT_URL=https://your-id.ngrok-free.app/clara.jsonld
 
 TODO: Some Solid providers are not fully compliant with the Solid specification and do not support Client ID Documents. In this case, we should
-  perform the "dynamic registration" step and create a new client for the backend, requesting user permission. While this isn't ideal, because 
+  perform the "dynamic registration" step and create a new client for the backend, requesting user permission. While this isn't ideal, because
   the user needs to authorize two separate applications, it should still work.
 
 
@@ -60,7 +60,7 @@ Create the database
 
 We provide a CLI that allows you to perform all steps of the clara workflow.
 
-In these commands, `USERS-PROFILE` is the URL to the web id of a user who has been 
+In these commands, `USERS-PROFILE` is the URL to the web id of a user who has been
 authenticated by this app to act on the user's behalf
 
 ### general solid commands
@@ -139,6 +139,7 @@ File structure:
 
 ```
 at.ac.mdw.trompa/
+  scores-list
   scores/
      contains score documents
   mei/
@@ -159,6 +160,13 @@ timelines/
   webmidi/
      contains uploaded webmidi files
 ```
+
+scores-list is a schema:ItemList which contains a list of IRIs (URLs).
+Use the original URL location where the MEI was loaded from.
+You SHOULD NOT create a new score document if its original location is already in this document.
+You MUST add a new URL to this list if you add a new score.
+
+
 
 
 A "score" is a triple document containing:
@@ -199,11 +207,47 @@ Signals are:
 Intervals are:
 * tl:onTimeLine to their Timelines
 
+### Permissions
+
+PUT https://clara.solidcommunity.net/at.ac.mdw.trompa/scores/2abc60da-fe7d-4353-9a9a-63cac4a543e4.acl
+
+FOr public readable
+@prefix : <#>.
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+@prefix sco: <./>.
+@prefix c: </profile/card#>.
+
+:ControlReadWrite
+    a acl:Authorization;
+    acl:accessTo sco:2abc60da-fe7d-4353-9a9a-63cac4a543e4;
+    acl:agent c:me;
+    acl:mode acl:Control, acl:Read, acl:Write.
+:Read
+    a acl:Authorization;
+    acl:accessTo sco:2abc60da-fe7d-4353-9a9a-63cac4a543e4;
+    acl:agentClass foaf:Agent;
+    acl:mode acl:Read.
+
+For private only
+@prefix : <#>.
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+@prefix sco: <./>.
+@prefix c: </profile/card#>.
+
+:ControlReadWrite
+    a acl:Authorization;
+    acl:accessTo sco:2abc60da-fe7d-4353-9a9a-63cac4a543e4;
+    acl:agent c:me;
+    acl:mode acl:Control, acl:Read, acl:Write.
+
+
+
 ### file formats
 
 **TTL or json-ld?**
 
-Meld consumes JSON-LD. If the structure file is TTL and you request `Content-Type: application/ld+json` 
+Meld consumes JSON-LD. If the structure file is TTL and you request `Content-Type: application/ld+json`
 from a server, then the server will convert it on the fly, causing load on the server. We've had informal
 "complaints" from some pod proviers that this was causing undue load. So, save this file as JSON-LD.
 Most other files are TTL, just simply because it's "nicer to write", and the files are very small.
@@ -242,7 +286,99 @@ e.g.:
 
 
 
-#TODO Provide additional detail:
-- Creating performance container (or automate!)
-- Creating score RDF (or automate!)
-- Adding to score selection dropdown 
+Regarding MIDIs / WebMIDIs, we probably should link them from the performance's signal.  Let's use mo:derived_from, which is defined as "a related signal from which the described signal is derived", which is (kind of) applicable.
+I would suggest something like this, with all triples inside the performance's ttl file:
+<UUID1> a mo:Performance ;
+                 mo:recorded_as <UUID1#Signal> .
+
+<UUID1#Signal> a mo:Signal ;
+                 mo:available_as <pod-url/path/to/audio/UUID1.mp3> ;
+                 mo:derived_from <pod-url/path/to/MIDI/UUID1.mid> .
+
+<pod-url/path/to/MIDI/UUID1.mid> a mo:Signal ;
+                mo:derived_from <pod-url/path/to/WebMIDI/UUID1.json> .
+---
+
+TODO: What is the difference between POST and PUT for a container>
+
+You can't set additional attributes on a container when you create it, but you can
+PATCH it afterwards to add new attributes (according to David)
+
+
+When selecting a score URL, look at all of the existing scores in the user's pod
+and see if one of them is the URL. If so, reuse that score id
+ -> This requires enumerating all score objects every single time we add a new URL
+    but is an acceptable tradeoff
+
+
+---
+Files to delete - seem to be duplicated
+trompa-align-local.R: version of trompa-align.R which outputs results to stdout instead of file
+local_alignment_to_maps.py: duplicate code, uses above R file
+   -> both should be able to be replaced by better versions of the original code
+
+generate_structure_rdf.py: ??
+
+---
+
+frontend:
+When browsing the user's pod for existing item to perform,
+Parse dcterms:title for a work title, if it doesn't exist then show serverdomain:filename.mei
+
+Identify all expansions and then when a user is performing something, have a chooser for them to select
+ which one they are performing
+ -> send the expansion number to server to compute it
+
+Expansions: Beethoven ob35 has A and B part with 15 variations
+-> can we compute which appears to be the most correct expansion?
+
+web interface, perform something:
+ - list of things in your clara container
+ - trompa-music-encodings list
+ - input a url
+
+When you select to perform something:
+send /add to add an mei file
+ - downloads file
+ - gets title
+ - computes sha256
+ - Creates new Container
+ - result of task -> returns url to the container
+
+If existing score
+ - get Container/performances
+ - show list of performances
+
+frontend: Loop, waiting for status
+ - Get the structure (used to show where to perform)
+
+frontend: new performance
+ - After midi played, create a new webmidi file in the Container for the score
+ - Trigger align
+
+/align
+ - takes profile, location of container, location of performance, performance id
+ - Perform alignment
+ - save midi, mp3, alignment, maps file, metadata triples
+ - metadata triples are in a separate container - so that we know that everything in here is metadata (makes reading faster)
+
+
+frontend: list of performances
+
+
+
+
+python scripts/tpl_entrypoint_split_1.py --mei examples/example.mei --performance examples/example-clara-performance-midi.json --audio output.audio --maps output.maps
+
+python scripts/preprocess_mei.py --meiFile examples/example.mei --meiUri http://example.com/example.mei --structureUri http://example.com/example.jsonld --structureOutput example-output.jsonld --midiOutput example-output.mid
+
+python scripts/tpl_entrypoint_split_2.py --maps example-output.maps --performanceUri http://example.com/example.performance --meiUri http://example.com/example.mei --structureUri http://example.com/example.jsonld --audioUri http://example.com/example.audio --outputFilename example-output-align.json
+
+
+
+python scripts/solid.py upload-performance https://alastair.trompa-solid.upf.edu/profile/card#me https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/99666e85-b53b-4c2d-8523-afdfefadc6ff/ examples/example-clara-performance-midi.json
+
+No title set, trying to get one from the MEI
+Creating https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/99666e85-b53b-4c2d-8523-afdfefadc6ff/
+Created
+Uploading file https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/99666e85-b53b-4c2d-8523-afdfefadc6ff/Beethoven_WoO70-Breitkopf.mei
