@@ -1,3 +1,5 @@
+from collections import Counter
+from dataclasses import dataclass
 import io
 import json
 import logging
@@ -6,7 +8,7 @@ import uuid
 from urllib.error import HTTPError
 
 import rdflib
-from rdflib.namespace import RDF, SDO
+from rdflib.namespace import RDF, SDO, SKOS
 from rdflib.term import Literal
 import requests
 import requests.utils
@@ -14,7 +16,7 @@ from pyld import jsonld
 from rdflib import URIRef
 
 from scripts.convert_to_rdf import generate_structural_segmentation, score_to_graph, segmentation_to_graph
-from scripts.namespace import MO
+from scripts.namespace import MELD, MO, TL
 from trompaalign.mei import get_metadata_for_mei
 
 logger = logging.getLogger(__name__)
@@ -292,6 +294,24 @@ def set_resource_acl_public(solid_client, provider, profile, resource_uri: str):
     return acl_uri
 
 
+def delete_resource(solid_client, provider, profile, resource_uri: str):
+    """Delete a resource from a Solid pod.
+
+    Args:
+        solid_client: The Solid client instance
+        provider: The provider URL
+        profile: The profile URL
+        resource_uri: The URI of the resource to delete
+
+    Raises:
+        requests.HTTPError: If the deletion fails
+    """
+    headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "DELETE")
+    r = requests.delete(resource_uri, headers=headers)
+    r.raise_for_status()
+    return r
+
+
 def delete_acl_for_resource(solid_client, provider, profile, resource_uri: str):
     """Delete the ACL resource for a given resource using ETag preconditions."""
     acl_uri = discover_acl_uri(solid_client, provider, profile, resource_uri)
@@ -547,6 +567,164 @@ def list_external_score_urls(solid_client, provider, profile, storage):
     return external_urls
 
 
+@dataclass
+class Score:
+    uri: str
+    external_uri: str
+    mei_uri: str
+    performances_container: str
+    segments_uri: str
+
+
+def load_score_from_uri(solid_client, provider, profile, storage, uri: str) -> Score:
+    ttl_bytes = get_resource_from_pod(solid_client, provider, profile, uri, accept="text/turtle")
+    graph = rdflib.Graph()
+    uri_ref = URIRef(uri)
+
+    external_uri = None
+    mei_uri = None
+    performances_container = None
+    segments_uri = None
+
+    graph.parse(data=ttl_bytes.decode("utf-8"), format="n3")
+
+    # check the uri's type (i.e. skip old scores.ttl file)
+    triples = list(graph.triples((uri_ref, RDF.type, MO.Score)))
+    if not triples:
+        raise ValueError(f"URI {uri} is not a score")
+
+    for _s, _p, o in graph.triples((uri_ref, MO.published_as, None)):
+        if isinstance(o, rdflib.term.Node):
+            print("published_as", o)
+            external_uri = str(o)
+
+    for s, _p, _o in graph.triples((None, SKOS.exactMatch, URIRef(external_uri))):
+        if isinstance(s, rdflib.term.Node):
+            print("exactMatch", s)
+            mei_uri = str(s)
+
+    for s, _p, o in graph.triples((uri_ref, SKOS.related, None)):
+        if isinstance(o, rdflib.term.Node):
+            print("related", o)
+            performances_container = str(o)
+
+    for s, _p, o in graph.triples((uri_ref, MELD.segments, None)):
+        if isinstance(o, rdflib.term.Node):
+            print("segments", o)
+            segments_uri = str(o)
+
+    if external_uri is None or mei_uri is None or performances_container is None or segments_uri is None:
+        print(f"{uri=}, {external_uri=}, {mei_uri=}, {performances_container=}, {segments_uri=}")
+        raise ValueError(f"URI {uri} unexpectedly missing data")
+
+    return Score(
+        uri=uri,
+        external_uri=external_uri,
+        mei_uri=mei_uri,
+        performances_container=performances_container,
+        segments_uri=segments_uri,
+    )
+
+
+def list_score_urls(solid_client, provider, profile, storage):
+    """Enumerate the files in the scores/ container.
+
+    Returns a list of Score objects
+    """
+    resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
+    score_listing = get_pod_listing(solid_client, provider, profile, resource)
+    if score_listing is None:
+        return []
+    contents = get_contents_of_container(score_listing, resource)
+    print("contents", contents)
+    return contents
+
+
+def list_performance_urls(solid_client, provider, profile, storage, performances_container: str) -> list[str]:
+    """Get all of the performances for a specific performance container
+
+    Arguments:
+        performances_container: the URI of the performances container (from Score.performances_container)
+    """
+
+    contents = get_contents_of_container(performances_container, performances_container)
+    return contents
+
+
+@dataclass
+class Performance:
+    uri: str
+    performance_of: str
+    signal_uri: str
+    available_as: str
+    derived_from: str
+    timeline: str
+    offset: str | None = None
+
+
+def load_performance_from_uri(solid_client, provider, profile, uri: str) -> Performance:
+    ttl_bytes = get_resource_from_pod(solid_client, provider, profile, uri, accept="text/turtle")
+    graph = rdflib.Graph()
+    uri_ref = URIRef(uri)
+    graph.parse(data=ttl_bytes.decode("utf-8"), format="n3")
+    performance_of = None
+    signal_uri = None
+    available_as = None
+    derived_from = None
+    timeline = None
+    offset = None
+
+    triples = list(graph.triples((uri_ref, RDF.type, MO.Performance)))
+    if not triples:
+        raise ValueError(f"URI {uri} is not a performance")
+
+    for _s, _p, o in graph.triples((uri_ref, MO.performance_of, None)):
+        if isinstance(o, rdflib.term.Node):
+            performance_of = str(o)
+            print("performance_of", o)
+
+    for _s, _p, o in graph.triples((uri_ref, MO.recorded_as, None)):
+        if isinstance(o, rdflib.term.Node):
+            signal_uri = str(o)
+            print("recorded_as", o)
+
+    for _s, _p, o in graph.triples((uri_ref, MELD.offset, None)):
+        offset = str(o)
+        print("offset", o)
+        break
+
+    if signal_uri:
+        signal_ref = URIRef(signal_uri)
+        for _s, _p, o in graph.triples((signal_ref, MO.available_as, None)):
+            if isinstance(o, rdflib.term.Node):
+                available_as = str(o)
+                print("available_as", o)
+        for _s, _p, o in graph.triples((signal_ref, MO.derived_from, None)):
+            if isinstance(o, rdflib.term.Node):
+                derived_from = str(o)
+                print("derived_from", o)
+        for _s, _p, o in graph.triples((signal_ref, MO.time, None)):
+            if isinstance(o, rdflib.term.Node):
+                for _ss, _pp, oo in graph.triples((o, TL.onTimeLine, None)):
+                    if isinstance(oo, rdflib.term.Node):
+                        timeline = str(oo)
+                        print("timeline", oo)
+
+    if None in (performance_of, signal_uri, available_as, derived_from, timeline):
+        print(f"{uri=}, {performance_of=}, {signal_uri=}, {available_as=}, {derived_from=}, {timeline=}, {offset=}")
+        raise ValueError(f"URI {uri} unexpectedly missing data")
+
+    return Performance(
+        uri=uri,
+        performance_of=performance_of,
+        signal_uri=signal_uri,
+        available_as=available_as,
+        derived_from=derived_from,
+        timeline=timeline,
+        offset=offset,
+    )
+
+
 def update_score_list_bulk(solid_client, provider, profile, storage, external_urls: set[str]) -> tuple[int, int]:
     """Add multiple external URLs to the scores list in a single write.
 
@@ -782,3 +960,222 @@ def save_performance_timeline(solid_client, provider, profile, timeline_uri, tim
     r = requests.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
     r.raise_for_status()
     print("save_performance_timeline status:", r.text)
+
+
+def recursive_delete_from_pod(solid_client, provider, profile, container):
+    """
+    A container listing has 2 types of data returned from a query:
+     - the information about the container itself (has an ldp:contains section with
+         all items in that container)
+     - the information about each item in ldp:contains (including its @type)
+
+    So, we loop through all items. If it's an ldp:Container (and not the main ID), recurse into it
+    otherwise, just delete it.
+    After recursing into it, delete the container itself, as it'll be empty.
+    """
+    listing = get_pod_listing(solid_client, provider, profile, container)
+    for item in listing.get("@graph", []):
+        item_id = item["@id"]
+        # First item is ourselves, skip it
+        if item_id == container:
+            continue
+        if "ldp:Container" in item["@type"]:
+            # If the container has other containers, delete them
+            recursive_delete_from_pod(solid_client, provider, profile, item["@id"])
+        else:
+            # Otherwise it's just a file, delete it.
+            print(f"Delete file {item_id}")
+            delete_resource(solid_client, provider, profile, item_id)
+    # Finally, delete the container itself
+    delete_resource(solid_client, provider, profile, container)
+
+
+def delete_duplicate_scores(solid_client, provider, profile, storage, delete_empty_scores=False, dry_run=False):
+    """Delete duplicate scores that have no performances.
+
+    For scores with the same external_uri, if a score has no performances
+    and there are multiple scores with that external_uri, delete the score
+    and its associated resources (segments, mei, timeline container,
+    performance container, and score URI).
+
+    Args:
+        solid_client: The Solid client instance
+        provider: The provider URL
+        profile: The profile URL
+        storage: The storage URL
+        delete_empty_scores: If True, also delete scores with no performances
+            even if they are unique (count == 1). Default False.
+        dry_run: If True, show what would be deleted without actually deleting.
+            Default False.
+
+    Returns:
+        int: Number of scores deleted (or would be deleted in dry_run mode)
+    """
+    logger.info("Starting delete_duplicate_scores (delete_empty_scores=%s, dry_run=%s)", delete_empty_scores, dry_run)
+    if dry_run:
+        print("DRY RUN MODE: No files will be deleted")
+
+    # Get score list
+    score_uris = list_score_urls(solid_client, provider, profile, storage)
+    if not score_uris:
+        logger.info("No scores found")
+        print("No scores found")
+        return 0
+
+    logger.info("Found %d score URI(s)", len(score_uris))
+    print(f"Found {len(score_uris)} score URI(s)")
+
+    # Load each score and build a list of scores
+    scores = []
+    for score_uri in score_uris:
+        try:
+            logger.debug("Loading score from URI: %s", score_uri)
+            score = load_score_from_uri(solid_client, provider, profile, storage, score_uri)
+            scores.append(score)
+            logger.debug("Successfully loaded score: %s (external_uri: %s)", score.uri, score.external_uri)
+        except Exception as e:
+            logger.warning("Error loading score %s: %s", score_uri, e)
+            print(f"Error loading score {score_uri}: {e}")
+            continue
+
+    logger.info("Successfully loaded %d score(s)", len(scores))
+    print(f"Successfully loaded {len(scores)} score(s)")
+
+    # Make a Counter of external_uri to counts
+    external_uri_counts = Counter(score.external_uri for score in scores)
+    logger.info("External URI counts: %s", dict(external_uri_counts))
+
+    # For each score, get a list of performances
+    # If there are no performances and the count is > 1, delete the score
+    deleted_count = 0
+    for score in scores:
+        external_uri = score.external_uri
+        count = external_uri_counts[external_uri]
+
+        logger.info("Processing score URI: %s", score.uri)
+        logger.info("  External URI: %s", external_uri)
+        logger.info("  Count for this external_uri: %d", count)
+        print(f"Processing score: {score.uri}")
+        print(f"  External URI: {external_uri}")
+        print(f"  Count: {count}")
+
+        # Check if we should process this score
+        if count > 1:
+            logger.info("  Score is a duplicate (count > 1), will check for performances")
+        elif delete_empty_scores and count == 1:
+            logger.info("  Score is unique but delete_empty_scores=True, will check for performances")
+        else:
+            logger.info("  Skipping: score is unique (count=1) and delete_empty_scores=False")
+            print("  Skipping: score is unique (count=1) and delete_empty_scores=False")
+            continue
+
+        # Get performances for this score
+        try:
+            logger.debug("Getting performances for container: %s", score.performances_container)
+            # Get the listing for the performances container
+            listing = get_pod_listing(solid_client, provider, profile, score.performances_container)
+            if listing is None:
+                performance_urls = []
+            else:
+                performance_urls = get_contents_of_container(listing, score.performances_container)
+        except Exception as e:
+            logger.warning("Error getting performances for score %s: %s", score.uri, e)
+            print(f"Error getting performances for score {score.uri}: {e}")
+            performance_urls = []
+
+        num_performances = len(performance_urls)
+        logger.info("  Number of performances: %d", num_performances)
+        print(f"  Performances: {num_performances}")
+
+        # Never delete a score if it has at least one performance
+        if num_performances > 0:
+            logger.info("  Skipping: score has %d performance(s), will not delete", num_performances)
+            print(f"  Skipping: score has {num_performances} performance(s), will not delete")
+            continue
+
+        # If there are no performances, delete the score
+        action_prefix = "Would delete" if dry_run else "Deleting"
+        logger.info("  %s score: no performances and meets deletion criteria", action_prefix.lower())
+        print(f"  {action_prefix} duplicate score {score.uri} (external_uri: {external_uri}, no performances)")
+
+        # Extract score_id from score URI (basename)
+        score_id = os.path.basename(score.uri)
+
+        # Construct timeline container URI
+        timeline_container = os.path.join(storage, CLARA_CONTAINER_NAME, "timelines", score_id, "")
+
+        # Delete resources in order:
+        # 1. Segments file
+        try:
+            if dry_run:
+                logger.debug("Would delete segments: %s", score.segments_uri)
+                print(f"  Would delete segments: {score.segments_uri}")
+            else:
+                logger.debug("Deleting segments: %s", score.segments_uri)
+                delete_resource(solid_client, provider, profile, score.segments_uri)
+                print(f"  Deleted segments: {score.segments_uri}")
+        except Exception as e:
+            logger.error("Error deleting segments %s: %s", score.segments_uri, e)
+            print(f"  Error deleting segments {score.segments_uri}: {e}")
+
+        # 2. MEI file
+        try:
+            if dry_run:
+                logger.debug("Would delete MEI: %s", score.mei_uri)
+                print(f"  Would delete MEI: {score.mei_uri}")
+            else:
+                logger.debug("Deleting MEI: %s", score.mei_uri)
+                delete_resource(solid_client, provider, profile, score.mei_uri)
+                print(f"  Deleted MEI: {score.mei_uri}")
+        except Exception as e:
+            logger.error("Error deleting MEI %s: %s", score.mei_uri, e)
+            print(f"  Error deleting MEI {score.mei_uri}: {e}")
+
+        # 3. Timeline container (recursive delete)
+        try:
+            if dry_run:
+                logger.debug("Would delete timeline container: %s", timeline_container)
+                print(f"  Would delete timeline container: {timeline_container}")
+            else:
+                logger.debug("Deleting timeline container: %s", timeline_container)
+                recursive_delete_from_pod(solid_client, provider, profile, timeline_container)
+                print(f"  Deleted timeline container: {timeline_container}")
+        except Exception as e:
+            logger.error("Error deleting timeline container %s: %s", timeline_container, e)
+            print(f"  Error deleting timeline container {timeline_container}: {e}")
+
+        # 4. Performance container (recursive delete)
+        try:
+            if dry_run:
+                logger.debug("Would delete performance container: %s", score.performances_container)
+                print(f"  Would delete performance container: {score.performances_container}")
+            else:
+                logger.debug("Deleting performance container: %s", score.performances_container)
+                recursive_delete_from_pod(solid_client, provider, profile, score.performances_container)
+                print(f"  Deleted performance container: {score.performances_container}")
+        except Exception as e:
+            logger.error("Error deleting performance container %s: %s", score.performances_container, e)
+            print(f"  Error deleting performance container {score.performances_container}: {e}")
+
+        # 5. Score URI
+        try:
+            if dry_run:
+                logger.debug("Would delete score URI: %s", score.uri)
+                print(f"  Would delete score: {score.uri}")
+            else:
+                logger.debug("Deleting score URI: %s", score.uri)
+                delete_resource(solid_client, provider, profile, score.uri)
+                print(f"  Deleted score: {score.uri}")
+        except Exception as e:
+            logger.error("Error deleting score %s: %s", score.uri, e)
+            print(f"  Error deleting score {score.uri}: {e}")
+
+        deleted_count += 1
+
+    if dry_run:
+        logger.info("Would delete %d duplicate score(s) with no performances", deleted_count)
+        print(f"Would delete {deleted_count} duplicate score(s) with no performances")
+    else:
+        logger.info("Deleted %d duplicate score(s) with no performances", deleted_count)
+        print(f"Deleted {deleted_count} duplicate score(s) with no performances")
+    return deleted_count

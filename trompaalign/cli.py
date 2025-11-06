@@ -14,6 +14,8 @@ from trompaalign.solid import (
     add_score_to_list,
     create_and_save_structure,
     create_clara_container,
+    delete_duplicate_scores,
+    delete_resource,
     find_score_for_external_uri,
     list_external_score_urls,
     get_contents_of_container,
@@ -24,6 +26,7 @@ from trompaalign.solid import (
     http_options,
     lookup_provider_from_profile,
     patch_container_item_title,
+    recursive_delete_from_pod,
     delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
@@ -228,36 +231,6 @@ def cmd_get_score_for_url(profile, score_url, use_client_id_document):
         print(f"External MEI URL is in this user's solid pod as {score}")
 
 
-def recursive_delete_from_pod(solid_client, provider, profile, container):
-    """
-    A container listing has 2 types of data returned from a query:
-     - the information about the container itself (has an ldp:contains section with
-         all items in that container)
-     - the information about each item in ldp:contains (including its @type)
-
-    So, we loop through all items. If it's an ldp:Container (and not the main ID), recurse into it
-    otherwise, just delete it.
-    After recursing into it, delete the container itself, as it'll be empty.
-    """
-    listing = get_pod_listing(solid_client, provider, profile, container)
-    for item in listing.get("@graph", []):
-        item_id = item["@id"]
-        # First item is ourselves, skip it
-        if item_id == container:
-            continue
-        if "ldp:Container" in item["@type"]:
-            # If the container has other containers, delete them
-            recursive_delete_from_pod(solid_client, provider, profile, item["@id"])
-        else:
-            # Otherwise it's just a file, delete it.
-            headers = solid_client.get_bearer_for_user(provider, profile, item_id, "DELETE")
-            print(f"Delete file {item_id}")
-            requests.delete(item_id, headers=headers)
-    # Finally, delete the container itself
-    headers = solid_client.get_bearer_for_user(provider, profile, container, "DELETE")
-    requests.delete(container, headers=headers)
-
-
 @cli.command("delete-clara")
 @click.argument("profile")
 @click.option("-c", "--container")
@@ -301,8 +274,7 @@ def cmd_delete_resource(profile, resource, use_client_id_document):
         return
 
     cl = client.SolidClient(backend.backend, use_client_id_document)
-    headers = cl.get_bearer_for_user(provider, profile, resource, "DELETE")
-    requests.delete(resource, headers=headers)
+    delete_resource(cl, provider, profile, resource)
 
 
 @cli.command("upload-score")
@@ -543,6 +515,45 @@ def cmd_update_score_list(profile, use_client_id_document):
         return
     added, total = update_score_list_bulk(cl, provider, profile, storage, urls)
     print(f"Found {len(urls)} external URLs; added {added}; total in score list now {total}")
+
+
+@cli.command("delete-duplicate-scores")
+@click.argument("profile")
+@click.option(
+    "--delete-empty-scores",
+    is_flag=True,
+    help="Also delete scores with no performances even if they are unique (count == 1)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without actually deleting anything")
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def cmd_delete_duplicate_scores(profile, delete_empty_scores, dry_run, use_client_id_document):
+    """Delete duplicate scores from the scores/ container.
+
+    Deletes scores that have no performances. By default, only deletes duplicates
+    (scores with the same external_uri where count > 1). With --delete-empty-scores,
+    also deletes unique scores (count == 1) if they have no performances.
+    """
+    if dry_run:
+        print("DRY RUN MODE: No files will be deleted")
+    print(f"Looking up data for profile {profile}")
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+
+    storage = get_storage_from_profile(profile)
+    if not storage:
+        print("Cannot find storage, quitting")
+        return
+
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    deleted_count = delete_duplicate_scores(
+        cl, provider, profile, storage, delete_empty_scores=delete_empty_scores, dry_run=dry_run
+    )
+    if dry_run:
+        print(f"Total would be deleted: {deleted_count} score(s)")
+    else:
+        print(f"Total deleted: {deleted_count} score(s)")
 
 
 @cli.command("recursive-upload-directory")
