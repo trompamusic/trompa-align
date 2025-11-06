@@ -348,12 +348,41 @@ def get_contents_of_container(container, container_name):
         if item["@id"] == container_name:
             contains = item.get("ldp:contains")
             if not contains:
-                return []
+                continue
             if not isinstance(contains, list):
                 contains = [contains]
             for cont in contains:
                 contents.append(cont["@id"])
     return contents
+
+
+def get_contents_of_container_rdf(container_jsonld, container_name: str) -> list[str]:
+    """Extract contained resource URIs from a container JSON-LD using rdflib.
+
+    - Validates that the subject is an LDP Container (Container or BasicContainer)
+    - Returns a list of contained resource URIs via ldp:contains
+    """
+    LDP = rdflib.Namespace("http://www.w3.org/ns/ldp#")
+    print(json.dumps(container_jsonld, indent=2))
+    try:
+        g = rdflib.Graph()
+        g.parse(data=json.dumps(container_jsonld), format="json-ld")
+        subject = rdflib.URIRef(container_name)
+
+        # Validate container type
+        is_container = (subject, RDF.type, LDP.Container) in g or (subject, RDF.type, LDP.BasicContainer) in g
+        if not is_container:
+            return []
+
+        # Collect contained resources
+        contents: list[str] = []
+        for o in g.objects(subject, LDP.contains):
+            if isinstance(o, rdflib.term.Node):
+                contents.append(str(o))
+        return contents
+    except Exception as e:
+        print("Exception", e)
+        return []
 
 
 def get_resource_from_pod(solid_client, provider, profile, uri, accept=None):
@@ -482,7 +511,7 @@ def upload_mp3_to_pod(solid_client, provider, profile, resource, payload: bytes)
 def find_score_for_external_uri(solid_client, provider, profile, storage, mei_external_uri):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
     score_listing = get_pod_listing(solid_client, provider, profile, resource)
-    contents = get_contents_of_container(score_listing, resource)
+    contents = get_contents_of_container_rdf(score_listing, resource)
     for item in contents:
         file = get_resource_from_pod(solid_client, provider, profile, item)
         graph = rdflib.Graph()
@@ -518,12 +547,12 @@ def list_external_score_urls(solid_client, provider, profile, storage):
     return external_urls
 
 
-def update_score_mapping_bulk(solid_client, provider, profile, storage, external_urls: set[str]) -> tuple[int, int]:
-    """Add multiple external URLs to the scores mapping in a single write.
+def update_score_list_bulk(solid_client, provider, profile, storage, external_urls: set[str]) -> tuple[int, int]:
+    """Add multiple external URLs to the scores list in a single write.
 
     Returns (added_count, total_after).
     """
-    graph, _etag_ignored, score_data_resource = _get_score_mapping(solid_client, provider, profile, storage)
+    graph, _etag_ignored, score_data_resource = _get_score_list(solid_client, provider, profile, storage)
 
     existing_urls = set(str(o) for _s, _p, o in graph.triples((None, SDO.itemListElement, None)))
     to_add = [u for u in sorted(external_urls) if u not in existing_urls]
@@ -546,7 +575,7 @@ def update_score_mapping_bulk(solid_client, provider, profile, storage, external
         return 0, len(existing_urls)
 
     for url in to_add:
-        _add_score_to_mapping(graph, score_data_resource, url)
+        _add_score_to_list(graph, score_data_resource, url)
 
     exists, etag = _head_for_etag(solid_client, provider, profile, score_data_resource)
     ttl_bytes = graph.serialize(format="n3", encoding="utf-8")
@@ -563,20 +592,20 @@ def update_score_mapping_bulk(solid_client, provider, profile, storage, external
     return len(to_add), len(existing_urls) + len(to_add)
 
 
-def _get_empty_score_mapping_graph(score_data_resource):
+def _get_empty_score_list_graph(score_data_resource):
     graph = rdflib.Graph()
     graph.add((URIRef(score_data_resource), RDF.type, SDO.ItemList))
     graph.add((URIRef(score_data_resource), SDO.name, Literal("Scores in this user's CLARA instance")))
     return graph
 
 
-def _get_score_mapping(solid_client, provider, profile, storage):
-    """Get the score mapping from the scores.ttl file.
+def _get_score_list(solid_client, provider, profile, storage):
+    """Get the score list from the top-level scores-list file.
 
     Returns a tuple (graph, etag, resource_uri).
     If the file doesn't exist, returns (empty_graph, None, resource_uri).
     """
-    score_data_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores", "scores.ttl")
+    score_data_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores-list")
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, score_data_resource, "GET")
         headers["Accept"] = "text/turtle"
@@ -587,41 +616,37 @@ def _get_score_mapping(solid_client, provider, profile, storage):
         graph.parse(data=r.text, format="n3")
         return graph, etag, score_data_resource
     except requests.exceptions.HTTPError as e:
-        print("expected error", e)
         if e.response is not None and e.response.status_code == 404:
-            return _get_empty_score_mapping_graph(score_data_resource), None, score_data_resource
+            return _get_empty_score_list_graph(score_data_resource), None, score_data_resource
         else:
             raise e
 
 
-def _add_score_to_mapping(score_mapping_graph: rdflib.Graph, item_list_subject_uri: str, mei_external_uri: str):
-    """Add the external URL to the ItemList as a schema:itemListElement literal.
-
-    The ItemList subject is the `scores.ttl` resource URI, not the URL itself.
-    """
-    score_mapping_graph.add((URIRef(item_list_subject_uri), SDO.itemListElement, Literal(mei_external_uri)))
-    return score_mapping_graph
+def _add_score_to_list(score_list_graph: rdflib.Graph, item_list_subject_uri: str, mei_external_uri: str):
+    """Add the external URL to the ItemList as a schema:itemListElement IRI."""
+    score_list_graph.add((URIRef(item_list_subject_uri), SDO.itemListElement, URIRef(mei_external_uri)))
+    return score_list_graph
 
 
-def score_exists_in_mapping(solid_client, provider, profile, storage, mei_external_uri: str) -> bool:
-    """Return True if the given external URL is present in the scores mapping, else False.
+def score_exists_in_list(solid_client, provider, profile, storage, mei_external_uri: str) -> bool:
+    """Return True if the given external URL is present in the scores list, else False.
 
     Read-only; performs no writes.
     """
-    graph, _etag, _resource = _get_score_mapping(solid_client, provider, profile, storage)
-    for _s, _p, o in graph.triples((None, SDO.itemListElement, Literal(mei_external_uri))):
+    graph, _etag, _resource = _get_score_list(solid_client, provider, profile, storage)
+    for _s, _p, o in graph.triples((None, SDO.itemListElement, URIRef(mei_external_uri))):
         # First match is sufficient
         return True
     return False
 
 
-def add_score_to_mapping(solid_client, provider, profile, storage, mei_external_uri) -> bool:
-    """Public helper to add a score URL to the mapping iff missing.
+def add_score_to_list(solid_client, provider, profile, storage, mei_external_uri) -> bool:
+    """Public helper to add a score URL to the score list iff missing.
 
     Uses the bulk update path even for a single URL to ensure a single read/write.
     Returns True if added; False if it already existed.
     """
-    added, _total = update_score_mapping_bulk(solid_client, provider, profile, storage, {mei_external_uri})
+    added, _total = update_score_list_bulk(solid_client, provider, profile, storage, {mei_external_uri})
     return added > 0
 
 
@@ -687,14 +712,14 @@ def create_and_save_structure(
     r.raise_for_status()
     print(r.text)
 
-    # Add the external MEI URL to the scores mapping, race-aware, single bulk write
+    # Add the external MEI URL to the scores list
     try:
-        added, _total = update_score_mapping_bulk(solid_client, provider, profile, storage, {mei_external_uri})
+        added, _total = update_score_list_bulk(solid_client, provider, profile, storage, {mei_external_uri})
         if added == 0:
-            print("Score already present in scores mapping; continuing")
+            print("Score already present in scores list; continuing")
     except SolidError as e:
-        # Mapping update conflict; surface but do not fail the creation process
-        print(f"Warning: could not update scores mapping: {e}")
+        # List update conflict; surface but do not fail the creation process
+        print(f"Warning: could not update scores list: {e}")
 
     return score_resource
 

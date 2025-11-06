@@ -11,7 +11,7 @@ from solidauth.db import Base
 
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
-    add_score_to_mapping,
+    add_score_to_list,
     create_and_save_structure,
     create_clara_container,
     find_score_for_external_uri,
@@ -27,7 +27,7 @@ from trompaalign.solid import (
     delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
-    update_score_mapping_bulk,
+    update_score_list_bulk,
     upload_mei_to_pod,
     upload_midi_to_pod,
     upload_webmidi_to_pod,
@@ -489,12 +489,12 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
     align_recording(profile, score_url, webmidi_url, midi_url)
 
 
-@cli.command("add-score-to-mapping")
+@cli.command("add-score-to-list")
 @click.argument("profile")
 @click.argument("score_url")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_add_score_to_mapping(profile, score_url, use_client_id_document):
-    """Add a score to the score mapping"""
+def cmd_add_score_to_list(profile, score_url, use_client_id_document):
+    """Add a score URL to the score list"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -506,13 +506,13 @@ def cmd_add_score_to_mapping(profile, score_url, use_client_id_document):
 
     cl = client.SolidClient(backend.backend, use_client_id_document)
     try:
-        added = add_score_to_mapping(cl, provider, profile, storage, score_url)
+        added = add_score_to_list(cl, provider, profile, storage, score_url)
         if added:
-            print(f"Added {score_url} to scores mapping")
+            print(f"Added {score_url} to scores list")
         else:
-            print(f"Score {score_url} already exists in mapping")
+            print(f"Score {score_url} already exists in list")
     except requests.HTTPError as e:
-        print(f"Failed to update mapping: {e}")
+        print(f"Failed to update score list: {e}")
         if e.response is not None:
             print(e.response.text)
 
@@ -521,10 +521,10 @@ def cmd_add_score_to_mapping(profile, score_url, use_client_id_document):
 @click.argument("profile")
 @click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 def cmd_update_score_list(profile, use_client_id_document):
-    """Scan the user's scores/ container and update the scores mapping with public URLs.
+    """Scan the user's scores/ container and update the score list with public URLs.
 
     Reads all score description resources in the Clara scores container, extracts mo:published_as URLs,
-    deduplicates them, and writes them into the scores.ttl mapping in a single update.
+    deduplicates them, and writes them into the top-level scores-list in a single update.
     """
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -541,8 +541,8 @@ def cmd_update_score_list(profile, use_client_id_document):
     if not urls:
         print("No external score URLs found in scores/ container")
         return
-    added, total = update_score_mapping_bulk(cl, provider, profile, storage, urls)
-    print(f"Found {len(urls)} external URLs; added {added}; total in mapping now {total}")
+    added, total = update_score_list_bulk(cl, provider, profile, storage, urls)
+    print(f"Found {len(urls)} external URLs; added {added}; total in score list now {total}")
 
 
 @cli.command("recursive-upload-directory")
