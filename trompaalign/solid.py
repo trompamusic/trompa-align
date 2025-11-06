@@ -362,6 +362,9 @@ def patch_container_item_title(solid_client, provider, profile, container, item,
 
 def get_contents_of_container(container, container_name):
     contents = []
+    # Handle empty containers or invalid input - if container is not a dict or @graph doesn't exist, return empty list
+    if not isinstance(container, dict) or "@graph" not in container:
+        return contents
     for item in container["@graph"]:
         # This returns 1 item for the actual url, which has ldp:contains: [list, of items]
         # but then also enumerates the list of items
@@ -974,6 +977,10 @@ def recursive_delete_from_pod(solid_client, provider, profile, container):
     After recursing into it, delete the container itself, as it'll be empty.
     """
     listing = get_pod_listing(solid_client, provider, profile, container)
+    if listing is None:
+        # If listing is None, just delete the container itself
+        delete_resource(solid_client, provider, profile, container)
+        return
     for item in listing.get("@graph", []):
         item_id = item["@id"]
         # First item is ourselves, skip it
@@ -1032,7 +1039,6 @@ def delete_duplicate_scores(solid_client, provider, profile, storage, delete_emp
             logger.debug("Loading score from URI: %s", score_uri)
             score = load_score_from_uri(solid_client, provider, profile, storage, score_uri)
             scores.append(score)
-            logger.debug("Successfully loaded score: %s (external_uri: %s)", score.uri, score.external_uri)
         except Exception as e:
             logger.warning("Error loading score %s: %s", score_uri, e)
             print(f"Error loading score {score_uri}: {e}")
