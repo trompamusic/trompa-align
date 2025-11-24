@@ -32,6 +32,18 @@ services:
       - trompaalign.celery
       - worker
 
+  celery-beat:
+    image: trompa-align
+    restart: always
+    env_file: celery-environment
+    command:
+      - uv
+      - run
+      - celery
+      - -A
+      - trompaalign.celery
+      - beat
+
   db:
     image: postgres
     restart: always
