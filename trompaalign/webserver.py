@@ -248,12 +248,18 @@ def check_user_perms():
 
     provider = lookup_provider_from_profile(profile_url)
     always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    configuration = extensions.backend.backend.get_configuration_token(
-        issuer=provider,
-        profile=profile_url,
-        use_client_id_document=always_use_client_url,
-    )
-    has_permission = configuration is not None and bool(configuration.data) and "refresh_token" in configuration.data
+    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
+    try:
+        # Get an access token, and if it exists then also check that it hasn't expired.
+        # if it expired, try and refresh it and return an error if that fails.
+        cl.get_valid_access_token(provider, profile_url)
+        has_permission = True
+    except client.NoSuchAuthenticationError:
+        has_permission = False
+    except client.TokenRefreshFailed:
+        has_permission = False
+        # Token refresh failed, so we should delete the authentication and force the user to re-authenticate.
+        extensions.backend.backend.delete_configuration_token(provider, profile_url, always_use_client_url)
 
     return jsonify({"has_permission": has_permission})
 
