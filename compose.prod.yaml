@@ -4,7 +4,7 @@ volumes:
 
 services:
   web:
-    image: trompa-align
+    image: trompa-align-${CLARA_ENV}
     build:
       context: .
       dockerfile: Dockerfile
@@ -21,7 +21,7 @@ services:
     image: "redis:alpine"
 
   celery:
-    image: trompa-align
+    image: trompa-align-${CLARA_ENV}
     restart: always
     env_file: celery-environment
     command:
@@ -33,7 +33,7 @@ services:
       - worker
 
   celery-beat:
-    image: trompa-align
+    image: trompa-align-${CLARA_ENV}
     restart: always
     env_file: celery-environment
     command:
