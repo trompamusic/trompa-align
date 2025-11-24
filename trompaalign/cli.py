@@ -390,6 +390,31 @@ def add_turtle(profile, resource, file, use_client_id_document):
     print(r.text)
 
 
+@cli.command("add-jsonld")
+@click.argument("profile")
+@click.argument("resource")
+@click.argument("file", type=click.Path(exists=True))
+@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
+def add_jsonld(profile, resource, file, use_client_id_document):
+    """Upload any file to a pod with application/ld+json content type"""
+    provider = lookup_provider_from_profile(profile)
+    if not provider:
+        print("Cannot find provider, quitting")
+        return
+    storage = get_storage_from_profile(profile)
+    if not storage:
+        print("Cannot find storage, quitting")
+        return
+
+    payload = open(file, "rb").read()
+    print(f"Uploading file {resource}")
+    cl = client.SolidClient(backend.backend, use_client_id_document)
+    headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
+    headers["content-type"] = "application/ld+json"
+    r = requests.put(resource, data=payload, headers=headers)
+    print(r.text)
+
+
 @cli.command("get-file")
 @click.argument("profile")
 @click.argument("resource")
