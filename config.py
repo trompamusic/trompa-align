@@ -1,5 +1,7 @@
 import os
 
+from celery.schedules import crontab
+
 REDIS_URL = os.getenv("TR_ALIGN_REDIS_URL")
 
 SECRET_KEY = os.getenv("TR_ALIGN_SECRET_KEY")
@@ -28,6 +30,12 @@ CELERY = {
     "broker_url": REDIS_URL,
     "result_backend": REDIS_URL,
     "task_ignore_result": True,
+    "beat_schedule": {
+        "refresh-all-authentication-tokens": {
+            "task": "trompaalign.tasks.refresh_all_authentication_tokens",
+            "schedule": crontab(hour="0,12"),
+        },
+    },
 }
 
 LOCAL_DEV = os.getenv("TR_ALIGN_LOCAL_DEV") == "true"

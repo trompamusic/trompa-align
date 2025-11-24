@@ -45,6 +45,28 @@ class NoSuchPerformanceException(Exception):
 
 
 @shared_task(ignore_result=False)
+def refresh_all_authentication_tokens():
+    """Refresh all authentication tokens for all users."""
+    for configuration in backend.backend.get_configuration_tokens():
+        provider = configuration.issuer
+        profile = configuration.profile
+        print(f"Refreshing token for {profile} from {provider}")
+        # Dynamic registration has a FK to the registration record. If we used a client id document then
+        # the FK is null and the client_id is the URL of the client id document.
+        use_client_id_document = configuration.client_registration is None
+        cl = client.SolidClient(backend.backend, use_client_id_document)
+        # shouldn't get NoSuchAuthenticationError because we just got the configuration tokens from the backend
+        try:
+            # This will refresh if it's expired
+            cl.get_valid_access_token(provider, profile)
+            print(" ... done")
+        except client.TokenRefreshFailed:
+            # Unable to refresh, give up and just delete it.
+            print(f"Token refresh failed for {profile}, deleting")
+            backend.backend.delete_configuration_token(provider, profile, use_client_id_document)
+
+
+@shared_task(ignore_result=False)
 def add_score(profile, mei_external_uri):
     """
     To add a score, we have the following possible methods:

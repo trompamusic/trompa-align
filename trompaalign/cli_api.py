@@ -48,3 +48,19 @@ def cmd_align(profile, score_url, midi_file, celery):
         print(f"Task created: {task.task_id}")
     else:
         tasks.align_recording(profile, score_url, webmidi_url, midi_url)
+
+
+@cli_api.command("refresh-all-tokens")
+def refresh_all_tokens():
+    """Trigger the celery task to refresh all authentication tokens."""
+    try:
+        from trompaalign.tasks import refresh_all_authentication_tokens
+
+        task = refresh_all_authentication_tokens.delay()
+        print(f"Task created: {task.task_id}")
+        print(f"Task status: {task.status}")
+    except ImportError as e:
+        print(f"Error importing task: {e}")
+        print("Make sure trompa-align is available in the Python path")
+    except Exception as e:
+        print(f"Error triggering task: {e}")
