@@ -33,7 +33,7 @@ CELERY = {
     "beat_schedule": {
         "refresh-all-authentication-tokens": {
             "task": "trompaalign.tasks.refresh_all_authentication_tokens",
-            "schedule": crontab(hour="0,12"),
+            "schedule": crontab(minute=0, hour="0,12"),
         },
     },
 }
