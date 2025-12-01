@@ -1071,7 +1071,7 @@ wheels = [
 [[package]]
 name = "solidauth-oidc"
 version = "0.1.0"
-source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#4a5f0e44dd4a20799d2f6e2bbb95009f9d0c0774" }
+source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#04441fde747696ecab4c5debfbeddf755d0c2a1b" }
 dependencies = [
     { name = "click" },
     { name = "flask" },
