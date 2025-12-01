@@ -45,13 +45,13 @@ services:
       - beat
 
   db:
-    image: postgres
+    image: postgres:18
     restart: always
     environment:
       POSTGRES_PASSWORD: example
       POSTGRES_DB: solid_oidc
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
 
   fluentd:
     image: fluent/fluentd:v1.12.0-debian-1.0

@@ -44,12 +44,12 @@ services:
       - "/code/.venv"
 
   db:
-    image: postgres
+    image: postgres:18
     environment:
       POSTGRES_PASSWORD: example
       POSTGRES_DB: solid_oidc
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     ports:
       - "5432:5432"
 
