@@ -3,6 +3,7 @@
 import json
 import csv
 import io
+from collections import defaultdict
 
 
 def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
@@ -49,21 +50,30 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
     # Convert attrs to list of dictionaries for easier manipulation
     attrs_list = attrs if isinstance(attrs, list) else [attrs]
 
-    # Merge with threshold
-    merged = []
-    for note in smat_aligned_notes:
-        for attr in attrs_list:
-            if abs(note["tstamp"] - attr["tstamp"]) <= threshold and note["refPitch"] == attr["midiPitch"]:
-                merged.append({**note, **attr})
-                break
+    # Index attributes by MIDI pitch to avoid scanning the entire list each time
+    attrs_by_pitch = defaultdict(list)
+    for attr in attrs_list:
+        pitch = attr.get("midiPitch")
+        if pitch is None or attr.get("tstamp") is None or attr.get("id") is None:
+            continue
+        attrs_by_pitch[pitch].append(attr)
 
-    # Choose the candidate for each MEI note ID with most similar times
+    # Build candidate matches (equivalent to difference_inner_join + pitch filter)
+    candidate_matches = []
+    for note in smat_aligned_notes:
+        for attr in attrs_by_pitch.get(note["refPitch"], []):
+            dist = abs(note["tstamp"] - attr["tstamp"])
+            if dist <= threshold:
+                combined = {**note, **attr}
+                combined["dist"] = dist
+                candidate_matches.append(combined)
+
+    # Choose the closest candidate for each MEI note id
     matched = {}
-    for note in merged:
-        if note["id"] not in matched or abs(note["tstamp"] - note["tstamp"]) < abs(
-            matched[note["id"]]["tstamp"] - note["tstamp"]
-        ):
-            matched[note["id"]] = note
+    for candidate in candidate_matches:
+        mei_id = candidate["id"]
+        if mei_id not in matched or candidate["dist"] < matched[mei_id]["dist"]:
+            matched[mei_id] = candidate
 
     # Find non-reconciled notes
     matched_ref_ids = {note["refID"] for note in matched.values()}
@@ -71,18 +81,18 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
     print(f"{len(non_reconciled)} match failures.")
 
     # Prepare MAPS export
-    maps_export = []
-    for note in matched.values():
-        maps_export.append(
-            {
-                "obs_mean_onset": note["alignOntime"],
-                "xml_id": note["id"],
-                "velocity": note["alignOnvel"],
-                "confidence": 0,
-            }
+    grouped_by_onset = {}
+    for note in sorted(matched.values(), key=lambda n: (n["alignOntime"], n["dist"], n["id"])):
+        onset = note["alignOntime"]
+        entry = grouped_by_onset.setdefault(
+            onset, {"obs_mean_onset": onset, "xml_id": [], "velocity": [], "confidence": 0}
         )
+        entry["xml_id"].append(note["id"])
+        entry["velocity"].append(note["alignOnvel"])
 
-    # Add inserted notes
+    maps_export = sorted(grouped_by_onset.values(), key=lambda item: item["obs_mean_onset"])
+
+    # Add inserted notes (these remain scalar fields, matching the R script)
     for note in inserted_notes:
         maps_export.append(
             {
