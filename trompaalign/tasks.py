@@ -4,6 +4,7 @@ import os
 import tempfile
 import urllib.error
 import uuid
+from dataclasses import dataclass
 
 from flask import current_app
 import rdflib
@@ -46,6 +47,19 @@ class NoSuchScoreException(Exception):
 
 class NoSuchPerformanceException(Exception):
     pass
+
+
+@dataclass
+class PerformanceResult:
+    id: str
+    uri: str
+    timeline_uri: str
+    audio_uri: str
+
+
+@dataclass
+class AlignRecordingResult:
+    performance: PerformanceResult
 
 
 @shared_task(ignore_result=False)
@@ -258,4 +272,13 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         save_performance_manifest(cl, provider, profile, performance_resource, performance_document)
         save_performance_timeline(cl, provider, profile, timeline_resource, timeline_document)
 
-    return True
+        result_payload = AlignRecordingResult(
+            performance=PerformanceResult(
+                id=perf_fname,
+                uri=performance_resource,
+                timeline_uri=timeline_resource,
+                audio_uri=mp3_uri,
+            )
+        )
+
+    return result_payload

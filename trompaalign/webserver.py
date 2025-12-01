@@ -1,4 +1,6 @@
 import os
+import logging
+from dataclasses import asdict, is_dataclass
 from logging.config import dictConfig
 
 import flask
@@ -19,6 +21,9 @@ from trompaalign.solid import (
     upload_midi_to_pod,
     upload_webmidi_to_pod,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def celery_init_app(app: flask.Flask) -> Celery:
@@ -352,7 +357,18 @@ def align_status():
     else:
         if result.ready():
             # Finished
-            return jsonify({"status": "ok", "message": result.result})
+            payload = result.result
+            response = {"status": "ok"}
+            if payload is None:
+                return jsonify(response)
+            if is_dataclass(payload):
+                response.update(asdict(payload))
+                return jsonify(response)
+            logger.error(
+                "Unexpected payload type returned from align_recording task: %s",
+                type(payload),
+            )
+            return jsonify(response)
         else:
             # Still running
             return jsonify({"status": "pending"})
