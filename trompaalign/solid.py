@@ -40,6 +40,65 @@ jsonld_context = {
 CLARA_CONTAINER_NAME = "at.ac.mdw.trompa/"
 
 
+def is_lock_expired_response(resp: requests.Response) -> bool:
+    """Return True if the response body looks like a SolidCommunity lock timeout."""
+    try:
+        data = resp.json()
+        if data.get("statusCode") == 500 and isinstance(data.get("message"), str):
+            if "Lock expired" in data.get("message"):
+                return True
+    except Exception:
+        pass
+    try:
+        return "Lock expired after" in (resp.text or "")
+    except Exception:
+        return False
+
+
+def create_ldp_container(
+    solid_client,
+    provider,
+    profile,
+    container_uri: str,
+    *,
+    timeout: float | None = None,
+):
+    """Create an LDP BasicContainer using a Turtle payload."""
+    if not container_uri.endswith("/"):
+        container_uri = container_uri + "/"
+
+    headers = solid_client.get_bearer_for_user(provider, profile, container_uri, "PUT")
+
+    graph = rdflib.Graph()
+    container_ref = rdflib.URIRef(container_uri)
+    LDP = rdflib.Namespace("http://www.w3.org/ns/ldp#")
+    graph.add((container_ref, RDF.type, LDP.BasicContainer))
+    graph.add((container_ref, RDF.type, LDP.Container))
+    graph.add((container_ref, RDF.type, LDP.Resource))
+
+    turtle_data = graph.serialize(format="turtle")
+    type_headers = {"Accept": "text/turtle", "content-type": "text/turtle"}
+    headers.update(type_headers)
+
+    request_kwargs = {}
+    if timeout is not None:
+        request_kwargs["timeout"] = timeout
+
+    r = requests.put(container_uri, data=turtle_data.encode("utf-8"), headers=headers, **request_kwargs)
+    if r.status_code == 201:
+        return container_uri
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if is_lock_expired_response(r):
+            print(f"Warning: provider lock timeout, treating container create as success for {container_uri}")
+        else:
+            print(f"Unexpected status creating container {container_uri}: {e}")
+            print(f"Response: {r.text}")
+            raise
+    return container_uri
+
+
 def http_options(solid_client, provider, profile, container):
     headers = solid_client.get_bearer_for_user(provider, profile, container, "OPTIONS")
     r = requests.options(container, headers=headers)
@@ -868,29 +927,37 @@ def create_and_save_structure(
     score_data = score_graph.serialize(format="n3", encoding="utf-8")
 
     print("Making performance container:", performance_resource)
-    headers = solid_client.get_bearer_for_user(provider, profile, performance_resource, "PUT")
-    r = requests.put(performance_resource, headers=headers, timeout=10)
-    r.raise_for_status()
-    print(r.text)
+    create_ldp_container(solid_client, provider, profile, performance_resource, timeout=10)
 
     print("Making timeline container:", timeline_resource)
-    headers = solid_client.get_bearer_for_user(provider, profile, timeline_resource, "PUT")
-    r = requests.put(timeline_resource, headers=headers, timeout=10)
-    r.raise_for_status()
-    print(r.text)
+    create_ldp_container(solid_client, provider, profile, timeline_resource, timeout=10)
 
     print("Making score:", score_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, score_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(score_resource, data=score_data, headers=headers, timeout=10)
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"Error making score: {e}")
+        print(r.text)
+        raise e
+    finally:
+        print(r.text)
     print(r.text)
 
     print("Making segment:", segment_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, segment_resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = requests.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
-    r.raise_for_status()
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"Error making segment: {e}")
+        print(r.text)
+        raise e
+    finally:
+        print(r.text)
     print(r.text)
 
     # Add the external MEI URL to the scores list

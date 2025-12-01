@@ -3,34 +3,10 @@ import mimetypes
 from pathlib import Path
 from typing import Optional
 
-import rdflib
-from rdflib.namespace import RDF
-from rdflib import URIRef
 import requests
 
 from solidauth import client
-
-
-def is_lock_expired_response(resp: requests.Response) -> bool:
-    """Detect SolidCommunity lock timeout error responses.
-
-    Looks for a JSON body like:
-      {"statusCode":500, "message":"Lock expired after ..."}
-    Falls back to substring search in text body.
-    We've seen that solidcommunity.net returns a 500 error with a lock expired message if it takes more than 6 seconds
-    to process the upload, however the file still appears to be uploaded and created successfully.
-    """
-    try:
-        data = resp.json()
-        if data.get("statusCode") == 500 and isinstance(data.get("message"), str):
-            if "Lock expired" in data.get("message"):
-                return True
-    except Exception:
-        pass
-    try:
-        return "Lock expired after" in (resp.text or "")
-    except Exception:
-        return False
+from trompaalign.solid import create_ldp_container, is_lock_expired_response
 
 
 def _with_trailing_slash(uri: str) -> str:
@@ -65,55 +41,6 @@ def container_exists(solid_client: client.SolidClient, provider: str, profile: s
         pass
 
     return False
-
-
-def create_ldp_container(solid_client: client.SolidClient, provider: str, profile: str, container_uri: str):
-    """
-    Create an LDP container using rdflib instead of raw JSON.
-
-    Args:
-        solid_client: The Solid client instance
-        provider: The provider URL
-        profile: The profile URL
-        container_uri: The URI where the container should be created
-    """
-    # Ensure container URIs always end with a trailing slash
-    if not container_uri.endswith("/"):
-        container_uri = container_uri + "/"
-
-    headers = solid_client.get_bearer_for_user(provider, profile, container_uri, "PUT")
-
-    # Create RDF graph for the container
-    graph = rdflib.Graph()
-    container_ref = URIRef(container_uri)
-
-    # Add LDP container types
-    ldp = rdflib.Namespace("http://www.w3.org/ns/ldp#")
-    graph.add((container_ref, RDF.type, ldp.BasicContainer))
-    graph.add((container_ref, RDF.type, ldp.Container))
-    graph.add((container_ref, RDF.type, ldp.Resource))
-
-    # Serialize as turtle
-    turtle_data = graph.serialize(format="turtle")
-
-    # Set headers for turtle content
-    type_headers = {"Accept": "text/turtle", "content-type": "text/turtle"}
-    headers.update(type_headers)
-
-    r = requests.put(container_uri, data=turtle_data.encode("utf-8"), headers=headers)
-    if r.status_code == 201:
-        print(f"Successfully created container: {container_uri}")
-    else:
-        # Treat SolidCommunity lock timeout as success
-        try:
-            r.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            if is_lock_expired_response(r):
-                print(f"Warning: provider lock timeout, treating container create as success for {container_uri}")
-            else:
-                print(f"Unexpected status creating container {container_uri}: {e}")
-                print(f"Response: {r.text}")
-                raise
 
 
 def get_content_type(file_path: str) -> Optional[str]:
