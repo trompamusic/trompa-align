@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 import urllib.error
@@ -36,6 +37,9 @@ from trompaalign.solid import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class NoSuchScoreException(Exception):
     pass
 
@@ -50,7 +54,7 @@ def refresh_all_authentication_tokens():
     for configuration in backend.backend.get_configuration_tokens():
         provider = configuration.issuer
         profile = configuration.profile
-        print(f"Refreshing token for {profile} from {provider}")
+        logger.info(f"Refreshing token for {profile} from {provider}")
         # Dynamic registration has a FK to the registration record. If we used a client id document then
         # the FK is null and the client_id is the URL of the client id document.
         use_client_id_document = configuration.client_registration is None
@@ -59,10 +63,10 @@ def refresh_all_authentication_tokens():
         try:
             # This will refresh if it's expired
             cl.get_valid_access_token(provider, profile)
-            print(" ... done")
+            logger.info(" ... done")
         except client.TokenRefreshFailed:
             # Unable to refresh, give up and just delete it.
-            print(f"Token refresh failed for {profile}, deleting")
+            logger.error(f"Token refresh failed for {profile}, deleting")
             backend.backend.delete_configuration_token(provider, profile, use_client_id_document)
 
 
@@ -93,11 +97,11 @@ def add_score(profile, mei_external_uri):
 
     provider = lookup_provider_from_profile(profile)
     if not provider:
-        print("Cannot find provider, quitting")
+        logger.error("Cannot find provider, quitting")
         return
     storage = get_storage_from_profile(profile)
     if not storage:
-        print("Cannot find storage, quitting")
+        logger.error("Cannot find storage, quitting")
         return
 
     try:
@@ -109,7 +113,7 @@ def add_score(profile, mei_external_uri):
     # Early exit if the score already exists in mapping
     try:
         if score_exists_in_list(cl, provider, profile, storage, mei_external_uri):
-            print("Score already present in score list; returning without changes")
+            logger.info("Score already present in score list; returning without changes")
             return None
     except Exception:
         # Non-fatal: continue with normal flow
@@ -121,7 +125,7 @@ def add_score(profile, mei_external_uri):
         r.raise_for_status()
         mei_text = r.text
     except requests.exceptions.RequestException as e:
-        print(f"Error downloading MEI file: {e}")
+        logger.error(f"Error downloading MEI file: {e}")
         raise SolidError(f"Error downloading MEI file: {e}")
 
     is_valid = mei_is_valid(mei_text)
@@ -148,11 +152,11 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
 
     provider = lookup_provider_from_profile(profile)
     if not provider:
-        print("Cannot find provider, quitting")
+        logger.error("Cannot find provider, quitting")
         return
     storage = get_storage_from_profile(profile)
     if not storage:
-        print("Cannot find storage, quitting")
+        logger.error("Cannot find storage, quitting")
         return
 
     use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
@@ -172,7 +176,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         triples = list(graph.triples((uri_ref, MO.published_as, None)))
         if triples:
             external_mei_url = triples[0][2]
-            print(f"External MEI file is {external_mei_url}")
+            logger.info(f"External MEI file is {external_mei_url}")
         else:
             raise NoSuchScoreException(
                 f"Cannot find external location of MEI file given the score resource {score_url}"
@@ -184,8 +188,8 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
             # TODO: Should the timeline container be related to the score too?
             performance_uuid = str(performance_container).split("/")[-2]
             timeline_container = os.path.join(clara_container, "timelines", performance_uuid)
-            print(f"Performance container is {performance_container}")
-            print(f"Timeline container is {timeline_container}")
+            logger.info(f"Performance container is {performance_container}")
+            logger.info(f"Timeline container is {timeline_container}")
         else:
             raise NoSuchPerformanceException(
                 f"Cannot find location of performance container given the score resource {score_url}"
@@ -198,14 +202,14 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
             fp.write(mei_content)
 
         if webmidi_url is not None:
-            print("Converting webmidi to midi and uploading")
+            logger.info("Converting webmidi to midi and uploading")
             webmidi = get_resource_from_pod(cl, provider, profile, webmidi_url)
             midi = midi_json_to_midi(json.loads(webmidi.decode("utf-8")))
             midi_file = os.path.join(td, "performance.mid")
             midi.save(midi_file)
             midi_url = upload_midi_to_pod(cl, provider, profile, storage, open(midi_file, "rb").read())
         else:
-            print("only got a midi URL, using it directly")
+            logger.info("only got a midi URL, using it directly")
             midi_contents = get_resource_from_pod(cl, provider, profile, midi_url)
             midi_file = os.path.join(td, "performance.mid")
             with open(midi_file, "wb") as fp:
@@ -230,9 +234,9 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         )
 
         performance_resource = os.path.join(performance_container, perf_fname)
-        print(f"Performance resource: {performance_resource}")
+        logger.info(f"Performance resource: {performance_resource}")
         timeline_resource = os.path.join(timeline_container, perf_fname)
-        print(f"Timeline resource: {timeline_resource}")
+        logger.info(f"Timeline resource: {timeline_resource}")
 
         audio_resource = os.path.join(audio_container, audio_fname)
         mp3_uri = upload_mp3_to_pod(
