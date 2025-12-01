@@ -39,9 +39,13 @@ services:
       - --loglevel=INFO
     env_file:
       - env.docker
-    volumes:
-      - ".:/code"
-      - "/code/.venv"
+    develop:
+      watch:
+        - action: sync+restart
+          path: .
+          target: /code
+          ignore:
+            - .venv
 
   db:
     image: postgres:18
