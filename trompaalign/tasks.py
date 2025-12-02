@@ -49,6 +49,12 @@ class NoSuchPerformanceException(Exception):
     pass
 
 
+class AlignmentFailed(Exception):
+    def __init__(self, midi_url: str, message: str | None = None) -> None:
+        super().__init__(message or "Alignment failed")
+        self.midi_url = midi_url
+
+
 @dataclass
 class PerformanceResult:
     id: str
@@ -233,44 +239,52 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
         audio_container = os.path.join(clara_container, "audio")
         perf_fname = str(uuid.uuid4())
         audio_fname = str(uuid.uuid4()) + ".mp3"
-        performance_graph, timeline_graph = perform_workflow(
-            midi_file,
-            mei_file,
-            expansion,
-            external_mei_url,
-            score_url,
-            performance_container,
-            timeline_container,
-            audio_container,
-            td,
-            perf_fname,
-            audio_fname,
-        )
 
-        performance_resource = os.path.join(performance_container, perf_fname)
-        logger.info(f"Performance resource: {performance_resource}")
-        timeline_resource = os.path.join(timeline_container, perf_fname)
-        logger.info(f"Timeline resource: {timeline_resource}")
+        try:
+            performance_graph, timeline_graph = perform_workflow(
+                midi_file,
+                mei_file,
+                expansion,
+                external_mei_url,
+                score_url,
+                performance_container,
+                timeline_container,
+                audio_container,
+                td,
+                perf_fname,
+                audio_fname,
+            )
 
-        audio_resource = os.path.join(audio_container, audio_fname)
-        mp3_uri = upload_mp3_to_pod(
-            cl, provider, profile, audio_resource, open(os.path.join(td, audio_fname), "rb").read()
-        )
+            performance_resource = os.path.join(performance_container, perf_fname)
+            logger.info(f"Performance resource: {performance_resource}")
+            timeline_resource = os.path.join(timeline_container, perf_fname)
+            logger.info(f"Timeline resource: {timeline_resource}")
 
-        # Add triples for Signal->Midi and Midi->webmidi
-        performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))
-        performance_signal_ref = URIRef(f"{performance_resource}#Signal")
-        performance_graph.add((performance_signal_ref, RDF.type, MO.Signal))
-        performance_graph.add((performance_signal_ref, MO.available_as, URIRef(mp3_uri)))
-        performance_graph.add((performance_signal_ref, MO.derived_from, URIRef(midi_url)))
-        if webmidi_url:
-            performance_graph.add((URIRef(midi_url), MO.derived_from, URIRef(webmidi_url)))
+            audio_resource = os.path.join(audio_container, audio_fname)
+            mp3_uri = upload_mp3_to_pod(
+                cl,
+                provider,
+                profile,
+                audio_resource,
+                open(os.path.join(td, audio_fname), "rb").read(),
+            )
 
-        performance_document = graph_to_turtle(performance_graph)
-        timeline_document = graph_to_jsonld(timeline_graph, mei_uri=external_mei_url, tl_uri=timeline_resource)
+            # Add triples for Signal->Midi and Midi->webmidi
+            performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))
+            performance_signal_ref = URIRef(f"{performance_resource}#Signal")
+            performance_graph.add((performance_signal_ref, RDF.type, MO.Signal))
+            performance_graph.add((performance_signal_ref, MO.available_as, URIRef(mp3_uri)))
+            performance_graph.add((performance_signal_ref, MO.derived_from, URIRef(midi_url)))
+            if webmidi_url:
+                performance_graph.add((URIRef(midi_url), MO.derived_from, URIRef(webmidi_url)))
 
-        save_performance_manifest(cl, provider, profile, performance_resource, performance_document)
-        save_performance_timeline(cl, provider, profile, timeline_resource, timeline_document)
+            performance_document = graph_to_turtle(performance_graph)
+            timeline_document = graph_to_jsonld(timeline_graph, mei_uri=external_mei_url, tl_uri=timeline_resource)
+
+            save_performance_manifest(cl, provider, profile, performance_resource, performance_document)
+            save_performance_timeline(cl, provider, profile, timeline_resource, timeline_document)
+        except Exception as exc:
+            raise AlignmentFailed(midi_url) from exc
 
         result_payload = AlignRecordingResult(
             performance=PerformanceResult(

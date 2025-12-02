@@ -30,6 +30,9 @@ CELERY = {
     "broker_url": REDIS_URL,
     "result_backend": REDIS_URL,
     "task_ignore_result": True,
+    "task_serializer": "json",
+    "result_serializer": "dataclass-json",
+    "accept_content": ["json", "dataclass-json"],
     "beat_schedule": {
         "refresh-all-authentication-tokens": {
             "task": "trompaalign.tasks.refresh_all_authentication_tokens",

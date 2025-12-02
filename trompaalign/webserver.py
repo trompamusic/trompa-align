@@ -280,6 +280,14 @@ def add_score_status():
         if isinstance(result.result, SolidError):
             # This is a known failure mode, one of our custom exceptions
             return jsonify({"status": "error", "error": str(result.result)})
+        if isinstance(result.result, tasks.AlignmentFailed):
+            return jsonify(
+                {
+                    "status": "error",
+                    "error": str(result.result),
+                    "midi_url": result.result.midi_url,
+                }
+            )
         else:
             # An unknown failure mode
             print("Unknown failure mode", result.result)
