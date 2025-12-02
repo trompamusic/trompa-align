@@ -13,6 +13,7 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client
 import solidauth
 
+from trompaalign import celery_serializers  # noqa: F401
 from trompaalign import extensions, tasks
 from trompaalign.solid import (
     SolidError,

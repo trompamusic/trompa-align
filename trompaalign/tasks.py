@@ -17,6 +17,7 @@ from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from solidauth import client
+from trompaalign import celery_serializers  # noqa: F401
 from trompaalign.extensions import backend
 from trompaalign.mei import mei_is_valid
 from trompaalign.solid import (
