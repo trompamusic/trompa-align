@@ -7,7 +7,7 @@ import flask
 import sentry_sdk
 from celery import Celery, Task
 from celery.result import AsyncResult
-from flask import current_app, jsonify, redirect, request
+from flask import current_app, jsonify, redirect, request, url_for
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client
@@ -135,7 +135,8 @@ def clara_jsonld():
 
 
 @webserver_bp.route("/clara-backend.jsonld")
-def clara_backend_jsonld():
+@webserver_bp.route("/clara-backend<string:suffix>.jsonld")
+def clara_backend_jsonld(suffix=""):
     # In Solid-OIDC you can register a client by having the "client_id" field be a URL to a json-ld document
     # It's normally recommended that this is a static file, but for simplicity serve it from flask
 
@@ -145,7 +146,7 @@ def clara_backend_jsonld():
 
     client_information = {
         "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
-        "client_id": baseurl + "clara-backend.jsonld",
+        "client_id": baseurl + url_for("register.client_id_url", suffix=suffix),
         **current_app.config["CLIENT_REGISTRATION_DATA"],
     }
 
