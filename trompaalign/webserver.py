@@ -141,8 +141,8 @@ def clara_backend_jsonld(suffix=""):
     # It's normally recommended that this is a static file, but for simplicity serve it from flask
 
     baseurl = current_app.config["BASE_URL"]
-    if not baseurl.endswith("/"):
-        baseurl += "/"
+    if baseurl.endswith("/"):
+        baseurl = baseurl[:-1]
 
     client_information = {
         "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
