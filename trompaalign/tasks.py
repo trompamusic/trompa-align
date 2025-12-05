@@ -16,6 +16,7 @@ from scripts.convert_to_rdf import graph_to_jsonld, graph_to_turtle
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
+from scripts.smat_align import SmatException
 from solidauth import client
 from trompaalign import celery_serializers  # noqa: F401
 from trompaalign.extensions import backend
@@ -285,7 +286,11 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
             save_performance_manifest(cl, provider, profile, performance_resource, performance_document)
             save_performance_timeline(cl, provider, profile, timeline_resource, timeline_document)
         except Exception as exc:
-            raise AlignmentFailed(midi_url) from exc
+            if isinstance(exc, SmatException):
+                message = f"SMAT failed during {exc.stage}: {exc}"
+            else:
+                message = str(exc)
+            raise AlignmentFailed(midi_url, message) from exc
 
         result_payload = AlignRecordingResult(
             performance=PerformanceResult(

@@ -8,6 +8,14 @@ import tempfile
 import uuid
 
 
+class SmatException(Exception):
+    """Raised when a SMAT alignment step fails."""
+
+    def __init__(self, stage: str, message: str) -> None:
+        super().__init__(message)
+        self.stage = stage
+
+
 def smat_align(file1, file2):
     # Align 2 midi files. This is a python port of MIDIToMIDIAlign.sh from SMAT
     # It assumes that the compiled tools are in $PATH
@@ -24,17 +32,17 @@ def smat_align(file1, file2):
         subprocess.run(["midi2pianoroll", "0", file2_stem], cwd=tempdir)
 
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_spr.txt")):
-            raise Exception(f"spr of first file, {file1_stem}_spr.txt, doesn't exist")
+            raise SmatException("midi2pianoroll", f"spr of first file, {file1_stem}_spr.txt, doesn't exist")
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_spr.txt")):
-            raise Exception(f"spr of second file, {file2_stem}_spr.txt, doesn't exist")
+            raise SmatException("midi2pianoroll", f"spr of second file, {file2_stem}_spr.txt, doesn't exist")
 
         subprocess.run(["SprToFmt3x", f"{file1_stem}_spr.txt", f"{file1_stem}_fmt3x.txt"], cwd=tempdir)
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_fmt3x.txt")):
-            raise Exception(f"fmt3x of first file, {file1_stem}_fmt3x.txt, doesn't exist")
+            raise SmatException("SprToFmt3x", f"fmt3x of first file, {file1_stem}_fmt3x.txt, doesn't exist")
 
         subprocess.run(["Fmt3xToHmm", f"{file1_stem}_fmt3x.txt", f"{file1_stem}_hmm.txt"], cwd=tempdir)
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_hmm.txt")):
-            raise Exception(f"hmm of first file, {file1_stem}_hmm.txt, doesn't exist")
+            raise SmatException("Fmt3xToHmm", f"hmm of first file, {file1_stem}_hmm.txt, doesn't exist")
 
         subprocess.run(
             [
@@ -47,7 +55,9 @@ def smat_align(file1, file2):
             cwd=tempdir,
         )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_pre_match.txt")):
-            raise Exception(f"pre_match of second file, {file2_stem}_pre_match.txt, doesn't exist")
+            raise SmatException(
+                "ScorePerfmMatcher", f"pre_match of second file, {file2_stem}_pre_match.txt, doesn't exist"
+            )
 
         subprocess.run(
             [
@@ -61,7 +71,9 @@ def smat_align(file1, file2):
             cwd=tempdir,
         )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_err_match.txt")):
-            raise Exception(f"err_match of second file, {file2_stem}_err_match.txt, doesn't exist")
+            raise SmatException(
+                "ErrorDetection", f"err_match of second file, {file2_stem}_err_match.txt, doesn't exist"
+            )
 
         subprocess.run(
             [
@@ -75,7 +87,9 @@ def smat_align(file1, file2):
             cwd=tempdir,
         )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_realigned_match.txt")):
-            raise Exception(f"realigned_match of second file, {file2_stem}_realigned_match.txt, doesn't exist")
+            raise SmatException(
+                "RealignmentMOHMM", f"realigned_match of second file, {file2_stem}_realigned_match.txt, doesn't exist"
+            )
 
         subprocess.run(
             [
@@ -87,7 +101,9 @@ def smat_align(file1, file2):
             cwd=tempdir,
         )
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_corresp.txt")):
-            raise Exception(f"end result of second file, {file2_stem}_corresp.txt.txt, doesn't exist")
+            raise SmatException(
+                "MatchToCorresp", f"end result of second file, {file2_stem}_corresp.txt.txt, doesn't exist"
+            )
 
         with open(os.path.join(tempdir, f"{file2_stem}_corresp.txt")) as fp:
             return fp.read()
