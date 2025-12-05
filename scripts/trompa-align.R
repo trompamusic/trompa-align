@@ -29,47 +29,47 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   print(paste("Processing", correspFile))
   correspRaw <- read_file(correspFile)
   correspString <- str_replace_all(correspRaw, "\\*", "-1")
-  corresp <- read_tsv(correspString, 
+  corresp <- read_tsv(correspString,
                       skip=1,
-                      col_names = c("alignID", "alignOntime", "alignSitch", 
-                                    "alignPitch", "alignOnvel", "refID", "refOntime", 
+                      col_names = c("alignID", "alignOntime", "alignSitch",
+                                    "alignPitch", "alignOnvel", "refID", "refOntime",
                                     "refSitch", "refPitch", "refOnvel", "ignoreMe")
   )
-  
+
   # drop last column of corresp (artifact of bad TSV formatting)
   corresp <- select(corresp, -one_of("ignoreMe"))
   corresp <- mutate(corresp, tstamp = refOntime * 1000)
-  
+
   # separate out inserted notes (i.e., performed notes that aren't in the score)
   insertedNotes <- corresp %>% filter(refID == "-1")
   print("Inserted notes detected: ")
   print(nrow(insertedNotes))
-  
+
   # the rest are notes that were aligned via SMAT
   smatAlignedNotes <- setdiff(corresp, insertedNotes)
-  
-  
+
+
   merged <- difference_inner_join(smatAlignedNotes, attrs, by="tstamp",  max_dist = threshold, distance_col = "dist") %>%
     filter(midiPitch == refPitch)
-  
+
   # choose the candidate for each MEI note ID with most similar times
   matched <- group_by(merged, id)  %>% filter(rank(dist, ties.method="first") == 1)
-  
+
   diffs <- setdiff(smatAlignedNotes$refID, matched$refID)
   nonReconciliated<- filter(smatAlignedNotes, refID %in% diffs)
 
   print(paste(nrow(nonReconciliated), "match failures."))
-  
-  
+
+
   # for MAPS export:
   # group them by their *performance* time
-  mapsExport <- matched %>% 
-    select(id, alignOntime, alignOnvel) %>% 
-    group_by(alignOntime) %>% 
+  mapsExport <- matched %>%
+    select(id, alignOntime, alignOnvel) %>%
+    group_by(alignOntime) %>%
     summarise(list(id), list(alignOnvel))
   head(mapsExport)
   names(mapsExport) <- c("obs_mean_onset", "xml_id", "velocity")
-  
+
   # add in the inserted notes:
   insertedExport <- insertedNotes %>% select(alignOntime, alignSitch, alignOnvel)
   # the inserted note is not in the score and so does not have an MEI (xml) ID
@@ -79,11 +79,10 @@ generateMapsResultJson <- function(correspFile, attrs, outputFile) { # function 
   insertedExport$alignSitch <- str_replace(paste0("trompa-align_inserted_", insertedExport$alignSitch), "#", "s")
   names(insertedExport) <- c("obs_mean_onset", "xml_id", "velocity")
   mapsExport <- rbind(mapsExport, insertedExport)
-  
-  mapsExport$confidence <- 0
+
   mapsExport$obs_num <- as.numeric(rownames(mapsExport))
   mapsExportJson <- toJSON(mapsExport)
-  
+
   write(mapsExportJson, outputFile)
   print(paste("MAPS file written:", outputFile))
 }

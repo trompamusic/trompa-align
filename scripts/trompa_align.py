@@ -84,9 +84,7 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
     grouped_by_onset = {}
     for note in sorted(matched.values(), key=lambda n: (n["alignOntime"], n["dist"], n["id"])):
         onset = note["alignOntime"]
-        entry = grouped_by_onset.setdefault(
-            onset, {"obs_mean_onset": onset, "xml_id": [], "velocity": [], "confidence": 0}
-        )
+        entry = grouped_by_onset.setdefault(onset, {"obs_mean_onset": onset, "xml_id": [], "velocity": []})
         entry["xml_id"].append(note["id"])
         entry["velocity"].append(note["alignOnvel"])
 
@@ -99,7 +97,6 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
                 "obs_mean_onset": note["alignOntime"],
                 "xml_id": f"trompa-align_inserted_{note['alignSitch'].replace('#', 's')}",
                 "velocity": note["alignOnvel"],
-                "confidence": 0,
             }
         )
 

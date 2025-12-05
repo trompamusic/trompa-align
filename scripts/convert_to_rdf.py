@@ -36,15 +36,12 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
 
     unique_num = 0
     for ix, obs in enumerate(maps_result):
-        confidence = """maps:confidence "{0}" ;""".format(obs["confidence"]) if "confidence" in obs else ""
         # FIXME HACK -- currently averages note velocities occuring at the same time
         velocity = """maps:velocity "{0}" ;""".format(mean(obs["velocity"])) if "velocity" in obs else ""
         rdf += """tlUri:{ix} a tl:Instant ;
  tl:onTimeLine <{tlUri}> ;
- {confidence}{velocity}
- tl:at "P{mean_onset}S" ; """.format(
-            ix=ix, mean_onset=obs["obs_mean_onset"], confidence=confidence, velocity=velocity, tlUri=tlUri
-        )
+ {velocity}
+ tl:at "P{mean_onset}S" ; """.format(ix=ix, mean_onset=obs["obs_mean_onset"], velocity=velocity, tlUri=tlUri)
         # iterate through each associated MEI identifier
         for ix2, xml_id in enumerate(obs["xml_id"]):
             if ix2 == len(obs["xml_id"]) - 1:
@@ -59,7 +56,7 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
             )
         # iterate through again to annotate velocities for each performed note
         for ix3, velocity in enumerate(obs["velocity"]):
-            rdf += """<#v{uuid}> a oa:Annotation ; 
+            rdf += """<#v{uuid}> a oa:Annotation ;
     oa:motivatedBy oa:describing ;
     oa:hasTarget <#t{uuid}> ;
     oa:bodyValue "{velocity}" .
@@ -135,9 +132,9 @@ def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
       dcterms:created "{created}" ;
       meld:offset "-0.2" .
     <{performance_uri}#Signal> mo:available_as <{audio_uri}> ;
-        mo:time [ 
-            a tl:Interval; 
-            tl:onTimeLine <{timeline_uri}> 
+        mo:time [
+            a tl:Interval;
+            tl:onTimeLine <{timeline_uri}>
         ] .
     """
     return Graph().parse(data=rdf, format="n3")
@@ -289,7 +286,7 @@ def segmentation_to_graph(seg_data, segUri):
 <{segUri}> a so:SegmentLine .
     """.format(segUri=segUri)
     for ix, seg in enumerate(seg_data):
-        rdf += """<#{segId}> a so:Segment ; 
+        rdf += """<#{segId}> a so:Segment ;
     so:onSegmentLine <{segUri}#segmentation> ;
     meld:order "{ix}" ;
     frbr:embodiment [ a meld:MEIManifestation, rdf:Bag ;
