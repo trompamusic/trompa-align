@@ -146,7 +146,7 @@ def clara_backend_jsonld(suffix=""):
 
     client_information = {
         "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
-        "client_id": baseurl + url_for("register.client_id_url", suffix=suffix),
+        "client_id": baseurl + url_for("trompaalign.clara_backend_jsonld", suffix=suffix),
         **current_app.config["CLIENT_REGISTRATION_DATA"],
     }
 
