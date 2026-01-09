@@ -52,9 +52,3 @@ services:
       POSTGRES_DB: solid_oidc
     volumes:
       - pgdata:/var/lib/postgresql
-
-  fluentd:
-    image: fluent/fluentd:v1.12.0-debian-1.0
-    restart: always
-    volumes:
-      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf

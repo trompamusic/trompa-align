@@ -428,18 +428,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fluent-logger"
-version = "0.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "msgpack" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/98/2f/216b8a8b5ba98035ab6e75ec5b29a0e26809dfbf9af19eab729f187a950b/fluent-logger-0.10.0.tar.gz", hash = "sha256:678bda90c513ff0393964b64544ce41ef25669d2089ce6c3b63d9a18554b9bfa", size = 15270, upload-time = "2021-03-11T01:14:41.691Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/43/9cbd7756dfe2cddc0a76ec2eaec56449ac126455c36fe03ecc86f7feac8f/fluent_logger-0.10.0-py2.py3-none-any.whl", hash = "sha256:543637e5e62ec3fc3c92b44e5a4e148a3cea88a0f8ca4fae26c7e60fda7564c1", size = 12509, upload-time = "2021-03-11T01:14:39.954Z" },
-]
-
-[[package]]
 name = "frozendict"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -661,25 +649,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/57/1f/b067eed2314c13481e354dd32560c1d9f45d516dd44d9751b85e0e9798fc/mido-1.2.10.tar.gz", hash = "sha256:17b38a8e4594497b850ec6e78b848eac3661706bfc49d484a36d91335a373499", size = 103070, upload-time = "2021-05-10T15:44:57.79Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b5/6d/e18a5b59ff086e1cd61d7fbf943d86c5f593a4e68bfc60215ab74210b22b/mido-1.2.10-py2.py3-none-any.whl", hash = "sha256:0e618232063e0a220249da4961563c7636fea00096cfb3e2b87a4231f0ac1a9e", size = 51094, upload-time = "2021-05-10T15:44:55.447Z" },
-]
-
-[[package]]
-name = "msgpack"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cb/d0/7555686ae7ff5731205df1012ede15dd9d927f6227ea151e901c7406af4f/msgpack-1.1.0.tar.gz", hash = "sha256:dd432ccc2c72b914e4cb77afce64aab761c1137cc698be3984eee260bcb2896e", size = 167260, upload-time = "2024-09-10T04:25:52.197Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/5e/a4c7154ba65d93be91f2f1e55f90e76c5f91ccadc7efc4341e6f04c8647f/msgpack-1.1.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:3d364a55082fb2a7416f6c63ae383fbd903adb5a6cf78c5b96cc6316dc1cedc7", size = 150803, upload-time = "2024-09-10T04:24:40.911Z" },
-    { url = "https://files.pythonhosted.org/packages/60/c2/687684164698f1d51c41778c838d854965dd284a4b9d3a44beba9265c931/msgpack-1.1.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:79ec007767b9b56860e0372085f8504db5d06bd6a327a335449508bbee9648fa", size = 84343, upload-time = "2024-09-10T04:24:50.283Z" },
-    { url = "https://files.pythonhosted.org/packages/42/ae/d3adea9bb4a1342763556078b5765e666f8fdf242e00f3f6657380920972/msgpack-1.1.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:6ad622bf7756d5a497d5b6836e7fc3752e2dd6f4c648e24b1803f6048596f701", size = 81408, upload-time = "2024-09-10T04:25:12.774Z" },
-    { url = "https://files.pythonhosted.org/packages/dc/17/6313325a6ff40ce9c3207293aee3ba50104aed6c2c1559d20d09e5c1ff54/msgpack-1.1.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8e59bca908d9ca0de3dc8684f21ebf9a690fe47b6be93236eb40b99af28b6ea6", size = 396096, upload-time = "2024-09-10T04:24:37.245Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/a1/ad7b84b91ab5a324e707f4c9761633e357820b011a01e34ce658c1dda7cc/msgpack-1.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5e1da8f11a3dd397f0a32c76165cf0c4eb95b31013a94f6ecc0b280c05c91b59", size = 403671, upload-time = "2024-09-10T04:25:10.201Z" },
-    { url = "https://files.pythonhosted.org/packages/bb/0b/fd5b7c0b308bbf1831df0ca04ec76fe2f5bf6319833646b0a4bd5e9dc76d/msgpack-1.1.0-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:452aff037287acb1d70a804ffd022b21fa2bb7c46bee884dbc864cc9024128a0", size = 387414, upload-time = "2024-09-10T04:25:27.552Z" },
-    { url = "https://files.pythonhosted.org/packages/f0/03/ff8233b7c6e9929a1f5da3c7860eccd847e2523ca2de0d8ef4878d354cfa/msgpack-1.1.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:8da4bf6d54ceed70e8861f833f83ce0814a2b72102e890cbdfe4b34764cdd66e", size = 383759, upload-time = "2024-09-10T04:25:03.366Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/1b/eb82e1fed5a16dddd9bc75f0854b6e2fe86c0259c4353666d7fab37d39f4/msgpack-1.1.0-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:41c991beebf175faf352fb940bf2af9ad1fb77fd25f38d9142053914947cdbf6", size = 394405, upload-time = "2024-09-10T04:25:07.348Z" },
-    { url = "https://files.pythonhosted.org/packages/90/2e/962c6004e373d54ecf33d695fb1402f99b51832631e37c49273cc564ffc5/msgpack-1.1.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:a52a1f3a5af7ba1c9ace055b659189f6c669cf3657095b50f9602af3a3ba0fe5", size = 396041, upload-time = "2024-09-10T04:25:48.311Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/20/6e03342f629474414860c48aeffcc2f7f50ddaf351d95f20c3f1c67399a8/msgpack-1.1.0-cp311-cp311-win32.whl", hash = "sha256:58638690ebd0a06427c5fe1a227bb6b8b9fdc2bd07701bec13c2335c82131a88", size = 68538, upload-time = "2024-09-10T04:24:29.953Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/c4/5a582fc9a87991a3e6f6800e9bb2f3c82972912235eb9539954f3e9997c7/msgpack-1.1.0-cp311-cp311-win_amd64.whl", hash = "sha256:fd2906780f25c8ed5d7b323379f6138524ba793428db5d0e9d226d3fa6aa1788", size = 74871, upload-time = "2024-09-10T04:25:44.823Z" },
 ]
 
 [[package]]
@@ -1152,7 +1121,6 @@ dependencies = [
     { name = "flask-redis" },
     { name = "flask-shell-ipython" },
     { name = "flask-sqlalchemy" },
-    { name = "fluent-logger" },
     { name = "ipython" },
     { name = "jinja2" },
     { name = "jwcrypto" },
@@ -1191,7 +1159,6 @@ requires-dist = [
     { name = "flask-redis", specifier = "~=0.4.0" },
     { name = "flask-shell-ipython", specifier = "~=0.5.3" },
     { name = "flask-sqlalchemy", specifier = "~=3.1.1" },
-    { name = "fluent-logger", specifier = "~=0.10.0" },
     { name = "ipython", specifier = "~=8.35.0" },
     { name = "jinja2", specifier = "~=3.1.2" },
     { name = "jwcrypto", specifier = "~=1.5.6" },
