@@ -3,7 +3,7 @@ name = "trompa-align"
 version = "0.1.0"
 description = ""
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "celery==5.2.7",
     "click~=8.1.0",
@@ -15,7 +15,7 @@ dependencies = [
     "ipython~=8.35.0",
     "jinja2~=3.1.2",
     "jwcrypto~=1.5.6",
-    "lxml~=4.9.2",
+    "lxml~=5.4.0",
     "midi2audio~=0.1.1",
     "mido~=1.2.10",
     "oic~=1.7.0",

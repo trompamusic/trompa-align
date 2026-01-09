@@ -1,4 +1,4 @@
-FROM python:3.11 AS base
+FROM nikolaik/python-nodejs:python3.13-nodejs24 AS base
 
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=1 \
@@ -44,4 +44,12 @@ COPY . /code
 FROM base AS production
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
+
+WORKDIR /clara
+ARG CLARA_BRANCH=main
+RUN git clone -b $CLARA_BRANCH https://github.com/trompamusic/clara.git
+WORKDIR /clara/clara
+RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm npm run build
+
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]
