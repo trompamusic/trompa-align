@@ -36,14 +36,13 @@ RUN Rscript /code/install-packages.R
 
 COPY pyproject.toml uv.lock /code/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
 
 ENV PATH="/code/.venv/bin:$PATH"
 
 COPY . /code
 
 FROM base AS production
-
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
 
 WORKDIR /clara
 ARG CLARA_BRANCH=main
