@@ -52,4 +52,5 @@ WORKDIR /clara/clara
 RUN --mount=type=cache,target=/root/.npm npm ci
 RUN --mount=type=cache,target=/root/.npm npm run build
 
+WORKDIR /code
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]

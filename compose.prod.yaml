@@ -8,12 +8,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: base
     platform: linux/amd64
     env_file: production-environment
     restart: always
     expose:
       - "8000"
+    command:
+      - gunicorn
+      - -b
+      - 0.0.0.0:8000
+      - -w
+      - 2
+      - -t
+      - 5
+      - app:app
     volumes:
       - "${CLARA_BUILD_DIRECTORY}:/clara"
       - web-root:/web-root
@@ -26,8 +35,6 @@ services:
     restart: always
     env_file: celery-environment
     command:
-      - uv
-      - run
       - celery
       - -A
       - trompaalign.celery
@@ -38,8 +45,6 @@ services:
     restart: always
     env_file: celery-environment
     command:
-      - uv
-      - run
       - celery
       - -A
       - trompaalign.celery
