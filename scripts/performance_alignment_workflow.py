@@ -61,6 +61,7 @@ def perform_workflow(
     tempdir,
     perf_fname,
     audio_fname,
+    label,
 ):
     """Do an alignment of a performance vs the score
 
@@ -142,9 +143,9 @@ def perform_workflow(
     timeline_uri = os.path.join(timeline_container, perf_fname)
 
     timeline_graph = maps_result_to_graph(
-        maps_json, mei_uri, timeline_uri, score_uri, audio_uri, includePerformance=False
+        maps_json, mei_uri, timeline_uri, score_uri, audio_uri, includePerformance=False, label=label
     )
 
-    performance_graph = performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri)
+    performance_graph = performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri, label)
     print("** Success: Created timeline output: ", perf_fname)
     return performance_graph, timeline_graph

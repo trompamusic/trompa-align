@@ -318,6 +318,7 @@ def align():
     midi_type = request.form.get("midi_type")
     score_url = request.form.get("score")
     profile = request.form.get("profile")
+    label = request.form.get("label")
 
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
@@ -333,8 +334,10 @@ def align():
         webmidi_url = None
     else:
         return jsonify({"status": "error", "message": "Must have midi_type of webmidi or midi"}), 400
+    if not label:
+        return jsonify({"status": "error", "message": "Missing `label` parameter"}), 400
 
-    task = tasks.align_recording.delay(profile, score_url, webmidi_url, midi_url)
+    task = tasks.align_recording.delay(profile, score_url, webmidi_url, midi_url, label)
     print("made task", task.task_id)
     return jsonify({"status": "queued", "task_id": task.task_id})
 

@@ -162,7 +162,7 @@ def add_score(profile, mei_external_uri):
 
 
 @shared_task(ignore_result=False)
-def align_recording(profile, score_url, webmidi_url, midi_url):
+def align_recording(profile, score_url, webmidi_url, midi_url, label):
     """
 
     :param profile:
@@ -255,6 +255,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url):
                 td,
                 perf_fname,
                 audio_fname,
+                label,
             )
 
             performance_resource = os.path.join(performance_container, perf_fname)

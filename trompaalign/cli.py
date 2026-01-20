@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import click
@@ -483,7 +484,8 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
     else:
         midi_url = None
         webmidi_url = midi_url
-    align_recording(profile, score_url, webmidi_url, midi_url)
+    label = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    align_recording(profile, score_url, webmidi_url, midi_url, label)
 
 
 @cli.command("add-score-to-list")

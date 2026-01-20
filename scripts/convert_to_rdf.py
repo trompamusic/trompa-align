@@ -3,18 +3,18 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import mean
 
 from lxml import etree as ET
 from rdflib import Graph, URIRef, RDF, SKOS, Literal, BNode
-from rdflib.namespace import DCTERMS
+from rdflib.namespace import DCTERMS, RDFS
 from pyld import jsonld
 
-from scripts.namespace import MO, MELD
+from scripts.namespace import MO, MELD, TL
 
 
-def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, includePerformance):
+def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, includePerformance, label):
     maps_result = json.loads(maps_result_json)
     rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
 @prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
@@ -76,7 +76,7 @@ def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, in
     if includePerformance:
         # TODO: better way of doing this? Docs say to merge you should parse from text twice:
         #  https://rdflib.readthedocs.io/en/stable/merging.html, but it'd be great to merge nodes
-        performance_graph = performance_to_graph(tlUri, scoreUri, audioUri)
+        performance_graph = performance_to_graph(tlUri, tlUri, scoreUri, audioUri, label)
         graph.parse(data=performance_graph.serialize(format="n3"), format="n3")
     return graph
 
@@ -97,13 +97,20 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
                 except IOError:
                     print("Warning: Skipping file (could not read): ", fName)
                     continue
+            label = datetime.now(timezone.utc).isoformat(timespec="seconds")
             graphs.append(
                 {
                     # generate performance RDF
-                    "performance": performance_to_graph(row, tlUri, recordingUri),
+                    "performance": performance_to_graph(row, tlUri, worksUri, recordingUri, label),
                     # generate timeline RDF
                     "timeline": maps_result_to_graph(
-                        maps_result_json, segUri, meiUri, tlUri + "/" + row["PerformanceID"], False
+                        maps_result_json,
+                        meiUri,
+                        tlUri + "/" + row["PerformanceID"],
+                        worksUri,
+                        recordingUri,
+                        False,
+                        label,
                     ),
                     "performanceID": row["PerformanceID"],
                 }
@@ -112,32 +119,29 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
     return graphs
 
 
-def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri):
-    now = datetime.now()
-    label = now.strftime("%d.%m.%Y %H:%M:%S")
-    created = now.isoformat()
-    rdf = f"""@prefix mo: <http://purl.org/ontology/mo/> .
-@prefix so: <http://www.linkedmusic.org/ontologies/segment/> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix meld: <https://meld.linkedmusic.org/terms/> .
-@prefix tl: <http://purl.org/NET/c4dm/timeline.owl#> .
-@prefix mo: <http://purl.org/ontology/mo/> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
+def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri, label):
+    created = datetime.now(timezone.utc).isoformat()
+    graph = Graph()
+    performance_uri_ref = URIRef(performance_uri)
+    score_uri_ref = URIRef(score_uri)
+    audio_uri_ref = URIRef(audio_uri)
+    timeline_uri_ref = URIRef(timeline_uri)
+    signal_uri_ref = URIRef(f"{performance_uri}#Signal")
 
-    <{performance_uri}> a mo:Performance ;
-      mo:performance_of <{score_uri}> ;
-      mo:recorded_as <{performance_uri}#Signal> ;
-      rdfs:label "{label}" ;
-      dcterms:created "{created}" ;
-      meld:offset "-0.2" .
-    <{performance_uri}#Signal> mo:available_as <{audio_uri}> ;
-        mo:time [
-            a tl:Interval;
-            tl:onTimeLine <{timeline_uri}>
-        ] .
-    """
-    return Graph().parse(data=rdf, format="n3")
+    graph.add((performance_uri_ref, RDF.type, MO.Performance))
+    graph.add((performance_uri_ref, MO.performance_of, score_uri_ref))
+    graph.add((performance_uri_ref, MO.recorded_as, signal_uri_ref))
+    graph.add((performance_uri_ref, RDFS.label, Literal(label)))
+    graph.add((performance_uri_ref, DCTERMS.created, Literal(created)))
+    graph.add((performance_uri_ref, MELD.offset, Literal("-0.2")))
+
+    interval_ref = BNode()
+    graph.add((signal_uri_ref, MO.available_as, audio_uri_ref))
+    graph.add((signal_uri_ref, MO.time, interval_ref))
+    graph.add((interval_ref, RDF.type, TL.Interval))
+    graph.add((interval_ref, TL.onTimeLine, timeline_uri_ref))
+
+    return graph
 
 
 def graph_to_jsonld(g, mei_uri=None, tl_uri=None):
@@ -438,8 +442,15 @@ if __name__ == "__main__":
                 except IOError:
                     print("Could not read file: ", fName)
                     sys.exit()
+                label = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 g = maps_result_to_graph(
-                    maps_result_json, segUri, meiUri, tlUri, scoreUri, audioUri, includePerformance
+                    maps_result_json,
+                    meiUri,
+                    tlUri,
+                    scoreUri,
+                    audioUri,
+                    includePerformance,
+                    label,
                 )
                 if outputFormat == "ttl" or outputFormat == "both":
                     ttl = graph_to_turtle(g)

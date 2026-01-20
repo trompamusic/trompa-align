@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import click
 import flask
 from flask.cli import AppGroup
@@ -43,11 +45,12 @@ def cmd_align(profile, score_url, midi_file, celery):
     webmidi_url = None
 
     print(f"Aligning score {score_url} to recording {midi_url} and {midi_url} for profile {profile}")
+    label = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if celery:
-        task = tasks.align_recording.delay(profile, score_url, webmidi_url, midi_url)
+        task = tasks.align_recording.delay(profile, score_url, webmidi_url, midi_url, label)
         print(f"Task created: {task.task_id}")
     else:
-        tasks.align_recording(profile, score_url, webmidi_url, midi_url)
+        tasks.align_recording(profile, score_url, webmidi_url, midi_url, label)
 
 
 @cli_api.command("refresh-all-tokens")
