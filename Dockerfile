@@ -41,14 +41,18 @@ ENV PATH="/code/.venv/bin:$PATH"
 
 COPY . /code
 
-FROM base AS production
+FROM nikolaik/python-nodejs:python3.13-nodejs24 AS clara-builder
 
-WORKDIR /clara
+WORKDIR /clara-build
 ARG CLARA_BRANCH=main
 RUN git clone -b $CLARA_BRANCH https://github.com/trompamusic/clara.git
-WORKDIR /clara/clara
+WORKDIR /clara-build/clara
 RUN --mount=type=cache,target=/root/.npm npm ci
 RUN --mount=type=cache,target=/root/.npm npm run build
+
+FROM base AS production
+
+COPY --from=clara-builder /clara-build/clara/build /clara
 
 WORKDIR /code
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]
