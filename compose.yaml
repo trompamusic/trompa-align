@@ -6,7 +6,7 @@ services:
     image: trompa-align
     build:
       context: .
-      target: base
+      target: trompa-align
     platform: linux/amd64
     ports:
       - "8000:5000"

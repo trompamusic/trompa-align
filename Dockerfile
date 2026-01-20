@@ -9,11 +9,25 @@ ENV PYTHONUNBUFFERED=1
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.15 /uv /uvx /bin/
 
-#install dependencies (R, python, wget, unzip)
+#install dependencies needed for R-builder, but install the remaining dependencies in the trompa-align stage
+RUN apt-get update \
+    && apt-get -y install tzdata wget git unzip make r-base \
+    libharfbuzz-dev libfribidi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /code
+WORKDIR /code
+
+FROM base AS r-builder
+
+COPY ./install-packages.R /code
+RUN Rscript /code/install-packages.R
+
+FROM base AS trompa-align
+
 RUN apt-get update \
     && apt-get -y install ffmpeg fluidsynth fluid-soundfont-gm \
-    fluid-soundfont-gs tzdata wget git unzip make r-base \
-    libharfbuzz-dev libfribidi-dev less \
+    fluid-soundfont-gs less \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /usr/share/soundfonts
@@ -27,18 +41,12 @@ RUN unzip /smat/smat.zip -d /smat \
     && ./compile.sh \
     && mv Programs/* /usr/local/bin
 
-
-RUN mkdir /code
-WORKDIR /code
-
-COPY ./install-packages.R /code
-RUN Rscript /code/install-packages.R
-
 COPY pyproject.toml uv.lock /code/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --group prod
 
 ENV PATH="/code/.venv/bin:$PATH"
 
+COPY --from=r-builder /usr/local/lib/R /usr/local/lib/R
 COPY . /code
 
 FROM nikolaik/python-nodejs:python3.13-nodejs24 AS clara-builder
@@ -50,7 +58,7 @@ WORKDIR /clara-build/clara
 RUN --mount=type=cache,target=/root/.npm npm ci
 RUN --mount=type=cache,target=/root/.npm npm run build
 
-FROM base AS production
+FROM trompa-align AS production
 
 COPY --from=clara-builder /clara-build/clara/build /clara
 
