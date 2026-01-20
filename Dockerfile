@@ -35,8 +35,7 @@ COPY ./install-packages.R /code
 RUN Rscript /code/install-packages.R
 
 COPY pyproject.toml uv.lock /code/
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --group prod
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --group prod
 
 ENV PATH="/code/.venv/bin:$PATH"
 

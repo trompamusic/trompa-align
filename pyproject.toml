@@ -5,7 +5,8 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "celery==5.2.7",
+    "audioop-lts>=0.2.2",
+    "celery==5.6.2",
     "click~=8.1.0",
     "flask~=3.1.0",
     "flask-cors==3.0.10",
