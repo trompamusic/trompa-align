@@ -63,4 +63,4 @@ FROM trompa-align AS production
 COPY --from=clara-builder /clara-build/clara/build /clara
 
 WORKDIR /code
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-t", "5", "app:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "--threads", "5", "app:app"]
