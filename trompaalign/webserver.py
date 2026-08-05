@@ -10,7 +10,7 @@ from celery.result import AsyncResult
 from flask import current_app, jsonify, redirect, request, url_for
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
-from solidauth import client
+from solidauth import client, httpclient
 import solidauth
 
 from trompaalign import celery_serializers  # noqa: F401
@@ -75,8 +75,8 @@ def create_app():
     configure_logging()
     app = flask.Flask(__name__, static_folder="/clara/static")
     app.config.from_pyfile("../config.py")
+    httpclient.set_user_agent(f"CLARA/1.0 (+{app.config['BASE_URL']})")
     extensions.db.init_app(app)
-    extensions.redis_client.init_app(app)
     extensions.backend.init_app(app)
     extensions.cors.init_app(app)
 

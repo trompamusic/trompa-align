@@ -20,10 +20,6 @@ CLIENT_ID_DOCUMENT_URL = os.getenv("TR_ALIGN_CLIENT_ID_DOCUMENT_URL", None)
 if ALWAYS_USE_CLIENT_URL and CLIENT_ID_DOCUMENT_URL is None:
     raise ValueError("TR_ALIGN_CLIENT_ID_DOCUMENT_URL must be set if TR_ALIGN_ALWAYS_USE_CLIENT_URL is true")
 
-BACKEND = os.getenv("TR_ALIGN_BACKEND")
-if BACKEND not in ["redis", "db"]:
-    raise ValueError("TR_ALIGN_BACKEND must be 'redis' or 'db'")
-
 SENTRY_DSN = os.getenv("TR_ALIGN_SENTRY_DSN")
 
 CELERY = {

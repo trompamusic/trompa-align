@@ -1,9 +1,7 @@
 from flask_cors import CORS
-from flask_redis import FlaskRedis
 from flask_sqlalchemy import SQLAlchemy
 from solidauth.backend import SolidBackend
 from solidauth.backend.db_backend import DBBackend
-from solidauth.backend.redis_backend import RedisBackend
 
 
 class BackendExtension:
@@ -14,13 +12,9 @@ class BackendExtension:
             self.init_app(app)
 
     def init_app(self, app):
-        if app.config["BACKEND"] == "db":
-            self.backend = DBBackend(db.session)
-        elif app.config["BACKEND"] == "redis":
-            self.backend = RedisBackend(redis_client)
+        self.backend = DBBackend(db.session)
 
 
 db = SQLAlchemy()
-redis_client = FlaskRedis()
 backend = BackendExtension()
 cors = CORS()

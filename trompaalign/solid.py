@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import uuid
-from urllib.error import HTTPError
 
 import rdflib
 from rdflib.namespace import RDF, SDO, SKOS
@@ -14,6 +13,7 @@ import requests
 import requests.utils
 from pyld import jsonld
 from rdflib import URIRef
+from solidauth.solid import RdfFetchError, fetch_graph
 
 from scripts.convert_to_rdf import generate_structural_segmentation, score_to_graph, segmentation_to_graph
 from scripts.namespace import MELD, MO, TL
@@ -514,19 +514,16 @@ def lookup_provider_from_profile(profile_url: str):
 
     # If we get here, there was no rel in the options. Instead, try and get the card
     # and find its issuer
-    graph = rdflib.Graph()
     try:
-        graph.parse(profile_url)
-        issuer = rdflib.URIRef("http://www.w3.org/ns/solid/terms#oidcIssuer")
-        triples = list(graph.triples([None, issuer, None]))
-        if triples:
-            # first item in the response, 3rd item in the triple
-            return triples[0][2].toPython()
-    except HTTPError as e:
-        if e.status == 404:
-            print("Cannot find a profile at this url")
-        else:
-            raise e
+        graph = fetch_graph(profile_url)
+    except RdfFetchError as e:
+        print(f"Cannot fetch or parse a profile at this url: {e}")
+        return None
+    issuer = rdflib.URIRef("http://www.w3.org/ns/solid/terms#oidcIssuer")
+    triples = list(graph.triples([None, issuer, None]))
+    if triples:
+        # first item in the response, 3rd item in the triple
+        return triples[0][2].toPython()
 
 
 def get_title_from_mei(payload, filename):
@@ -1003,8 +1000,7 @@ def get_uri_ttl(uri, headers=None):
 
 
 def get_storage_from_profile(profile_uri):
-    graph = rdflib.Graph()
-    graph.parse(profile_uri)
+    graph = fetch_graph(profile_uri)
     storage = graph.value(
         subject=rdflib.URIRef(profile_uri), predicate=rdflib.URIRef("http://www.w3.org/ns/pim/space#storage")
     )
