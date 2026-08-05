@@ -978,7 +978,7 @@ wheels = [
 [[package]]
 name = "solidauth-oidc"
 version = "0.1.0"
-source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#5e80cbd4615a7defb8952cab202e5c98958a56c2" }
+source = { git = "https://github.com/trompamusic/solidauth-oidc.git?rev=main#13e5e1099220d020b0e41e24518209ab776ddeae" }
 dependencies = [
     { name = "jwcrypto" },
     { name = "oic" },

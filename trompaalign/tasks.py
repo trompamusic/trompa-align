@@ -17,7 +17,7 @@ from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from scripts.smat_align import SmatException
-from solidauth import client
+from solidauth import client, httpclient
 from trompaalign import celery_serializers  # noqa: F401
 from trompaalign.extensions import backend
 from trompaalign.mei import mei_is_valid
@@ -142,8 +142,7 @@ def add_score(profile, mei_external_uri):
         pass
 
     try:
-        headers = {"User-Agent": "Clara (https://github.com/trompamusic/clara)"}
-        r = requests.get(mei_external_uri, headers=headers, timeout=10)
+        r = httpclient.get(mei_external_uri, timeout=10)
         r.raise_for_status()
         mei_text = r.text
     except requests.exceptions.RequestException as e:

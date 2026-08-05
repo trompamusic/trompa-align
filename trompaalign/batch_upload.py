@@ -5,7 +5,7 @@ from typing import Optional
 
 import requests
 
-from solidauth import client
+from solidauth import client, httpclient
 from trompaalign.solid import create_ldp_container, is_lock_expired_response
 
 
@@ -21,7 +21,7 @@ def container_exists(solid_client: client.SolidClient, provider: str, profile: s
     uri = _with_trailing_slash(container_uri)
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
-        r = requests.head(uri, headers=headers)
+        r = httpclient.head(uri, headers=headers)
         if r.status_code == 404:
             return False
         if r.ok:
@@ -32,7 +32,7 @@ def container_exists(solid_client: client.SolidClient, provider: str, profile: s
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
         headers.update({"Accept": "text/turtle"})
-        r = requests.get(uri, headers=headers)
+        r = httpclient.get(uri, headers=headers)
         if r.status_code == 404:
             return False
         if r.ok:
@@ -117,7 +117,7 @@ def upload_file_to_pod(
     if content_type:
         headers["content-type"] = content_type
 
-    r = requests.put(remote_uri, data=content, headers=headers)
+    r = httpclient.put(remote_uri, data=content, headers=headers)
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:

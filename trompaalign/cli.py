@@ -7,7 +7,7 @@ import click
 import requests
 from trompaalign.extensions import db, backend
 from flask.cli import AppGroup
-from solidauth import client
+from solidauth import client, httpclient
 from solidauth.db import Base
 
 from trompaalign.solid import (
@@ -185,7 +185,7 @@ def cmd_get_resource(use_json, profile, resource, use_client_id_document):
     else:
         type_headers = {"Accept": "text/turtle"}
     headers.update(type_headers)
-    r = requests.get(resource, headers=headers)
+    r = httpclient.get(resource, headers=headers)
     r.raise_for_status()
     if use_json:
         print(json.dumps(r.json(), indent=2))
@@ -311,7 +311,7 @@ def cmd_upload_score_to_pod(profile, url, file, title, use_client_id_document):
     else:
         print(f"Downloading file from {url}")
         filename = os.path.basename(url)
-        r = requests.get(url)
+        r = httpclient.get(url)
         r.raise_for_status()
         payload = r.text
 
@@ -387,7 +387,7 @@ def add_turtle(profile, resource, file, use_client_id_document):
     cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(resource, data=payload, headers=headers)
+    r = httpclient.put(resource, data=payload, headers=headers)
     print(r.text)
 
 
@@ -412,7 +412,7 @@ def add_jsonld(profile, resource, file, use_client_id_document):
     cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "application/ld+json"
-    r = requests.put(resource, data=payload, headers=headers)
+    r = httpclient.put(resource, data=payload, headers=headers)
     print(r.text)
 
 
@@ -435,7 +435,7 @@ def get_file(profile, resource, save, use_client_id_document):
     print(f"Getting file {resource}")
     cl = client.SolidClient(backend.backend, use_client_id_document)
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
-    r = requests.get(resource, headers=headers)
+    r = httpclient.get(resource, headers=headers)
     r.raise_for_status()
     if save:
         parsed = urlparse(resource)

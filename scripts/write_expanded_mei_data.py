@@ -1,5 +1,5 @@
 import argparse
-import requests
+from solidauth import httpclient
 import sys
 
 import json
@@ -37,6 +37,6 @@ if __name__ == "__main__":
         with open(meiFile, "r") as f:
             data = f.read()
     else:
-        resp = requests.get(meiUri)
+        resp = httpclient.get(meiUri)
         data = resp.text
     write_expanded_mei_data(data, output, args.expansion)

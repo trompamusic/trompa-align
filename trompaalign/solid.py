@@ -13,6 +13,7 @@ import requests
 import requests.utils
 from pyld import jsonld
 from rdflib import URIRef
+from solidauth import httpclient
 from solidauth.solid import RdfFetchError, fetch_graph
 
 from scripts.convert_to_rdf import generate_structural_segmentation, score_to_graph, segmentation_to_graph
@@ -84,7 +85,7 @@ def create_ldp_container(
     if timeout is not None:
         request_kwargs["timeout"] = timeout
 
-    r = requests.put(container_uri, data=turtle_data.encode("utf-8"), headers=headers, **request_kwargs)
+    r = httpclient.put(container_uri, data=turtle_data.encode("utf-8"), headers=headers, **request_kwargs)
     if r.status_code == 201:
         return container_uri
     try:
@@ -101,7 +102,7 @@ def create_ldp_container(
 
 def http_options(solid_client, provider, profile, container):
     headers = solid_client.get_bearer_for_user(provider, profile, container, "OPTIONS")
-    r = requests.options(container, headers=headers)
+    r = httpclient.options(container, headers=headers)
     r.raise_for_status()
     return r.headers, r.content
 
@@ -153,7 +154,7 @@ def discover_acl_uri(solid_client, provider, profile, resource_uri):
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "HEAD")
         logger.debug("HEAD %s with headers: %s", resource_uri, headers)
-        r = requests.head(resource_uri, headers=headers)
+        r = httpclient.head(resource_uri, headers=headers)
         # Some servers may not allow HEAD; ignore failures and try OPTIONS
         logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
         if r.ok:
@@ -190,7 +191,7 @@ def _head_for_etag(solid_client, provider, profile, uri):
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
         logger.debug("Probing ETag via HEAD %s with headers: %s", uri, headers)
-        r = requests.head(uri, headers=headers)
+        r = httpclient.head(uri, headers=headers)
         logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
         if r.status_code == 404:
             logger.debug("HEAD indicates ACL does not exist: %s", uri)
@@ -205,7 +206,7 @@ def _head_for_etag(solid_client, provider, profile, uri):
             headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
             headers.update({"Accept": "text/turtle"})
             logger.debug("Probing ETag via GET %s with headers: %s", uri, headers)
-            r = requests.get(uri, headers=headers)
+            r = httpclient.get(uri, headers=headers)
             logger.debug("GET status: %s, headers: %s", r.status_code, r.headers)
             if r.status_code == 404:
                 return False, None
@@ -322,7 +323,7 @@ def _put_document_with_preconditions(
         headers["If-Match"] = etag
     if not existing:
         headers["If-None-Match"] = "*"
-    r = requests.put(resource_uri, data=content_bytes, headers=headers)
+    r = httpclient.put(resource_uri, data=content_bytes, headers=headers)
     if r.status_code == 412:
         raise SolidError("Update failed due to precondition (ETag mismatch). Reload and retry.")
     r.raise_for_status()
@@ -366,7 +367,7 @@ def delete_resource(solid_client, provider, profile, resource_uri: str):
         requests.HTTPError: If the deletion fails
     """
     headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "DELETE")
-    r = requests.delete(resource_uri, headers=headers)
+    r = httpclient.delete(resource_uri, headers=headers)
     r.raise_for_status()
     return r
 
@@ -381,7 +382,7 @@ def delete_acl_for_resource(solid_client, provider, profile, resource_uri: str):
     headers = solid_client.get_bearer_for_user(provider, profile, acl_uri, "DELETE")
     if etag:
         headers["If-Match"] = etag
-    r = requests.delete(acl_uri, headers=headers)
+    r = httpclient.delete(acl_uri, headers=headers)
     if r.status_code == 412:
         raise SolidError("ACL delete failed due to precondition (ETag mismatch). Reload and retry.")
     r.raise_for_status()
@@ -413,7 +414,7 @@ def patch_container_item_title(solid_client, provider, profile, container, item,
   <{item}> <http://purl.org/dc/terms/title> "{title}" .
 }}"""
 
-    r = requests.patch(container, data=update_data, headers=headers)
+    r = httpclient.patch(container, data=update_data, headers=headers)
     r.raise_for_status()
     print(r.text)
     print(f"Status: {r.status_code}")
@@ -471,7 +472,7 @@ def get_resource_from_pod(solid_client, provider, profile, uri, accept=None):
     headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
     if accept:
         headers.update({"Accept": accept})
-    r = requests.get(uri, headers=headers)
+    r = httpclient.get(uri, headers=headers)
     r.raise_for_status()
     return r.content
 
@@ -489,7 +490,7 @@ def create_clara_container(solid_client, provider, profile, storage):
     }
     type_headers = {"Accept": "application/ld+json", "content-type": "application/ld+json"}
     headers.update(type_headers)
-    r = requests.put(clara_container, data=json.dumps(container_payload), headers=headers)
+    r = httpclient.put(clara_container, data=json.dumps(container_payload), headers=headers)
     if r.status_code == 201:
         print("Successfully created")
     else:
@@ -503,7 +504,7 @@ def lookup_provider_from_profile(profile_url: str):
     :return:
     """
 
-    r = requests.options(profile_url)
+    r = httpclient.options(profile_url)
     r.raise_for_status()
     links = r.headers.get("Link")
     if links:
@@ -548,7 +549,7 @@ def upload_mei_to_pod(solid_client, provider, profile, storage, payload):
     headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     # TODO: Should this be an XML mimetype, or a specific MEI one?
     headers["content-type"] = "application/xml"
-    r = requests.put(resource, data=payload.encode("utf-8"), headers=headers)
+    r = httpclient.put(resource, data=payload.encode("utf-8"), headers=headers)
     r.raise_for_status()
     print(r.text)
     return resource
@@ -560,7 +561,7 @@ def upload_webmidi_to_pod(solid_client, provider, profile, storage, payload: byt
     print(f"Uploading webmidi file to {resource}")
     headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "application/json"
-    r = requests.put(resource, data=payload, headers=headers)
+    r = httpclient.put(resource, data=payload, headers=headers)
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -571,7 +572,7 @@ def upload_midi_to_pod(solid_client, provider, profile, storage, payload: bytes)
     print(f"Uploading midi file to {resource}")
     headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/midi"
-    r = requests.put(resource, data=payload, headers=headers)
+    r = httpclient.put(resource, data=payload, headers=headers)
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -581,7 +582,7 @@ def upload_mp3_to_pod(solid_client, provider, profile, resource, payload: bytes)
     print(f"Uploading mp3 file to {resource}")
     headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "audio/mpeg"
-    r = requests.put(resource, data=payload, headers=headers)
+    r = httpclient.put(resource, data=payload, headers=headers)
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -846,7 +847,7 @@ def _get_score_list(solid_client, provider, profile, storage):
     try:
         headers = solid_client.get_bearer_for_user(provider, profile, score_data_resource, "GET")
         headers["Accept"] = "text/turtle"
-        r = requests.get(score_data_resource, headers=headers)
+        r = httpclient.get(score_data_resource, headers=headers)
         r.raise_for_status()
         etag = r.headers.get("ETag")
         graph = rdflib.Graph()
@@ -932,7 +933,7 @@ def create_and_save_structure(
     print("Making score:", score_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, score_resource, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(score_resource, data=score_data, headers=headers, timeout=10)
+    r = httpclient.put(score_resource, data=score_data, headers=headers, timeout=10)
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -946,7 +947,7 @@ def create_and_save_structure(
     print("Making segment:", segment_resource)
     headers = solid_client.get_bearer_for_user(provider, profile, segment_resource, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
+    r = httpclient.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -982,7 +983,7 @@ def get_uri_jsonld(uri, headers=None):
     if not headers:
         headers = {}
     headers.update({"Accept": "application/ld+json"})
-    r = requests.get(uri, headers=headers)
+    r = httpclient.get(uri, headers=headers)
     r.raise_for_status()
     logger.debug("Get json-ld from %s", uri)
     logger.debug("json-ld headers: %s", r.headers)
@@ -994,7 +995,7 @@ def get_uri_ttl(uri, headers=None):
     if not headers:
         headers = {}
     headers.update({"Accept": "text/turtle"})
-    r = requests.get(uri, headers=headers)
+    r = httpclient.get(uri, headers=headers)
     r.raise_for_status()
     return r.text
 
@@ -1014,7 +1015,7 @@ def save_performance_manifest(solid_client, provider, profile, performance_uri, 
     print(f"Uploading manifest to {performance_uri}")
     headers = solid_client.get_bearer_for_user(provider, profile, performance_uri, "PUT")
     headers["content-type"] = "text/turtle"
-    r = requests.put(performance_uri, data=manifest, headers=headers)
+    r = httpclient.put(performance_uri, data=manifest, headers=headers)
     r.raise_for_status()
     print("save_performance_manifest status:", r.text)
 
@@ -1023,7 +1024,7 @@ def save_performance_timeline(solid_client, provider, profile, timeline_uri, tim
     print(f"Uploading timeline to {timeline_uri}")
     headers = solid_client.get_bearer_for_user(provider, profile, timeline_uri, "PUT")
     headers["content-type"] = "application/ld+json"
-    r = requests.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
+    r = httpclient.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
     r.raise_for_status()
     print("save_performance_timeline status:", r.text)
 

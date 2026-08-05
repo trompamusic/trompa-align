@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 import pathlib
-import requests
+from solidauth import httpclient
 import subprocess
 import sys
 import tempfile
@@ -15,7 +15,7 @@ from write_expanded_mei_data import write_expanded_mei_data
 
 def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
     # fetch MEI
-    resp = requests.get(mei_uri)
+    resp = httpclient.get(mei_uri)
     mei_data = resp.text
     [
         process(performance_midi_file, mei_uri, expansions, outdir, tempdir, mei_data)

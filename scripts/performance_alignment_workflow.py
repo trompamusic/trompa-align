@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 
-import requests
+from solidauth import httpclient
 
 from . import verovio_midi
 from .convert_to_rdf import maps_result_to_graph, performance_to_graph
@@ -82,7 +82,7 @@ def perform_workflow(
         with open(mei_file, "r") as f:
             mei_data = f.read()
     else:
-        resp = requests.get(mei_uri)
+        resp = httpclient.get(mei_uri)
         mei_data = resp.text
         with open(os.path.join(tempdir, "score.mei"), "w") as out:
             out.write(mei_data)
