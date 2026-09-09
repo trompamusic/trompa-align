@@ -26,7 +26,7 @@ If you are using docker, copy the `.env.example` file to `env.docker`. If runnin
 If you're running in docker, most of these options don't need to be changed.
 
 In order to provide a seamless experience to users, we take advantage of Solid [Client ID Documents](https://solidproject.org/TR/oidc#clientids-document). This means that there must be a public URL pointing to
-the client id document. This document is served at http://localhost:8000/clara.jsonld
+the client id document. The backend document is served at http://localhost:8000/clara-backend.jsonld
 
 Public SOLID servers must be able to load this document from the internet, so for local development you will
 need a tunnel service such as ngrok. The free version is sufficient, but requires separate configuration
@@ -41,12 +41,12 @@ And take note of the public domain name. It will be something like https://f9da1
 
 Update `.env` to include
 
-    CONFIG_BASE_URL=https://your-id.ngrok-free.app
-    CLIENT_ID_DOCUMENT_URL=https://your-id.ngrok-free.app/clara.jsonld
+    TR_ALIGN_BASE_URL=https://your-id.ngrok-free.app
+    TR_ALIGN_CLIENT_ID_DOCUMENT_URL=https://your-id.ngrok-free.app/clara-backend.jsonld
 
-TODO: Some Solid providers are not fully compliant with the Solid specification and do not support Client ID Documents. In this case, we should
-  perform the "dynamic registration" step and create a new client for the backend, requesting user permission. While this isn't ideal, because
-  the user needs to authorize two separate applications, it should still work.
+`TR_ALIGN_CLIENT_ID_DOCUMENT_URL` determines if we use a client ID document or dynamic registration.
+
+Leave the variable unset or empty to use dynamic registration.
 
 
 ## Initial app setup
@@ -54,6 +54,10 @@ TODO: Some Solid providers are not fully compliant with the Solid specification 
 Create the database
 
     flask db create-database
+
+Apply authentication database migrations:
+
+    flask db upgrade
 
 
 ## Testing scripts

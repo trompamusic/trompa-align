@@ -18,6 +18,7 @@ from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from scripts.smat_align import SmatException
 from solidauth import client, httpclient
+from solidauth.solid import ProviderConfigurationError
 from trompaalign import celery_serializers  # noqa: F401
 from trompaalign.extensions import backend
 from trompaalign.mei import mei_is_valid
@@ -73,23 +74,23 @@ class AlignRecordingResult:
 @shared_task(ignore_result=False)
 def refresh_all_authentication_tokens():
     """Refresh all authentication tokens for all users."""
-    for configuration in backend.backend.get_configuration_tokens():
-        provider = configuration.issuer
-        profile = configuration.profile
-        logger.info(f"Refreshing token for {profile} from {provider}")
-        # Dynamic registration has a FK to the registration record. If we used a client id document then
-        # the FK is null and the client_id is the URL of the client id document.
-        use_client_id_document = configuration.client_registration is None
-        cl = client.SolidClient(backend.backend, use_client_id_document)
-        # shouldn't get NoSuchAuthenticationError because we just got the configuration tokens from the backend
+    for token_response in backend.backend.get_token_responses():
+        provider = token_response.issuer
+        webid = token_response.webid
+        client_id = token_response.client_id
+        document_url = client_id if token_response.client_registration is None else None
+        cl = client.SolidClient(backend.backend, client_id_document_url=document_url)
+        logger.info("Refreshing token for %s from %s with client %s", webid, provider, client_id)
         try:
-            # This will refresh if it's expired
-            cl.get_valid_access_token(provider, profile)
+            cl.get_valid_access_token(provider, webid)
             logger.info(" ... done")
+        except client.NoSuchAuthenticationError:
+            logger.info("Authentication no longer exists for %s with client %s", webid, client_id)
         except client.TokenRefreshFailed:
-            # Unable to refresh, give up and just delete it.
-            logger.error(f"Token refresh failed for {profile}, deleting")
-            backend.backend.delete_configuration_token(provider, profile, use_client_id_document)
+            logger.error("Token refresh failed for %s with client %s, deleting", webid, client_id)
+            backend.backend.delete_token_response(provider, webid, client_id)
+        except (client.BadClientIdError, ProviderConfigurationError):
+            logger.exception("Authentication configuration failed for %s with client %s", webid, client_id)
 
 
 @shared_task(ignore_result=False)
@@ -114,8 +115,7 @@ def add_score(profile, mei_external_uri):
     :return:
     """
 
-    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
 
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -180,8 +180,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url, label):
         logger.error("Cannot find storage, quitting")
         return
 
-    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
 
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
 

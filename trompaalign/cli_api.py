@@ -38,8 +38,9 @@ def cmd_align(profile, score_url, midi_file, celery):
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
 
-    use_client_id_document = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(
+        extensions.backend.backend, client_id_document_url=flask.current_app.config["CLIENT_ID_DOCUMENT_URL"]
+    )
     midi_payload = midi_file.read()
     midi_url = upload_midi_to_pod(cl, provider, profile, storage, midi_payload)
     webmidi_url = None

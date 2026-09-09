@@ -11,6 +11,7 @@ from flask import current_app, jsonify, redirect, request, url_for
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client, httpclient
+from solidauth.solid import ProviderConfigurationError
 import solidauth
 
 from trompaalign import celery_serializers  # noqa: F401
@@ -107,13 +108,6 @@ def create_app():
 webserver_bp = flask.Blueprint("trompaalign", __name__)
 
 
-def get_client_id_document_url_if_configured():
-    if current_app.config["ALWAYS_USE_CLIENT_URL"]:
-        return current_app.config["CLIENT_ID_DOCUMENT_URL"]
-    else:
-        return None
-
-
 @webserver_bp.route("/clara.jsonld")
 def clara_jsonld():
     # In Solid-OIDC you can register a client by having the "client_id" field be a URL to a json-ld document
@@ -160,23 +154,14 @@ def auth_request():
     webid = request.form.get("webid_or_provider")
     redirect_after = request.form.get("redirect_after")
 
-    # This redirect URL is the react app: It will receive the code and state, and then perform an API request
-    # to /api/auth/callback
     redirect_url = flask.current_app.config["REDIRECT_URL_BACKEND"]
-    client_id_document_url = get_client_id_document_url_if_configured()
-
-    use_client_id_document = current_app.config["ALWAYS_USE_CLIENT_URL"]
-
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=use_client_id_document)
-
-    # if we always use a client url, generate the url and pass it to generate_authentication_url
-    # if it fails with ClientIDDocumentRegistrationNotSupportedError then we need to do dynamic registration
-    # this means we need to pass registration_request (current_app.config["CLIENT_REGISTRATION_DATA"]) and client_id_document_url=None
-    # if always_use_client_url is False then always do a dynamic registration
+    cl = client.SolidClient(
+        extensions.backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"]
+    )
 
     registration_request = current_app.config["CLIENT_REGISTRATION_DATA"]
     try:
-        data = cl.generate_authentication_url(webid, registration_request, redirect_url, client_id_document_url)
+        data = cl.generate_authentication_url(webid, registration_request, redirect_url)
 
         provider = data["provider"]
         flask.session["provider"] = provider
@@ -188,23 +173,8 @@ def auth_request():
 
         return jsonify(data)
 
-    except client.NoProviderError as e:
+    except (client.NoProviderError, ProviderConfigurationError) as e:
         return jsonify({"error": str(e)}), 400
-
-
-@webserver_bp.route("/api/auth/callback", methods=["POST"])
-def auth_callback():
-    auth_code = flask.request.form.get("code")
-    state = flask.request.form.get("state")
-
-    provider = flask.session["provider"]
-
-    redirect_url = flask.current_app.config["REDIRECT_URL"]
-    client_id_document_url = get_client_id_document_url_if_configured()
-    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
-    success, data = cl.authentication_callback(auth_code, state, provider, redirect_url, client_id_document_url)
-    return jsonify({"status": success, "data": data})
 
 
 @webserver_bp.route("/api/auth/callback-backend", methods=["GET"])
@@ -221,10 +191,12 @@ def auth_callback_backend():
         return "No provider found", 400
 
     redirect_url = flask.current_app.config["REDIRECT_URL_BACKEND"]
-    client_id_document_url = get_client_id_document_url_if_configured()
-    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
-    success, data = cl.authentication_callback(auth_code, state, provider, redirect_url, client_id_document_url)
+    client_id_document_url = current_app.config["CLIENT_ID_DOCUMENT_URL"]
+    cl = client.SolidClient(extensions.backend.backend, client_id_document_url=client_id_document_url)
+    try:
+        success, data = cl.authentication_callback(auth_code, state, provider, redirect_url)
+    except (client.BadClientIdError, ProviderConfigurationError) as e:
+        return jsonify({"error": str(e)}), 400
 
     print("AUTH CALLBACK BACKEND")
     print("auth_code", auth_code)
@@ -254,19 +226,23 @@ def check_user_perms():
         return jsonify({"status": "error"}), 400
 
     provider = lookup_provider_from_profile(profile_url)
-    always_use_client_url = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=always_use_client_url)
+    cl = client.SolidClient(
+        extensions.backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"]
+    )
     try:
         # Get an access token, and if it exists then also check that it hasn't expired.
         # if it expired, try and refresh it and return an error if that fails.
+        client_id = cl.client_id_document_url
+        if client_id is None:
+            client_id = cl.get_client_id_and_secret_for_provider(provider)[0]
         cl.get_valid_access_token(provider, profile_url)
         has_permission = True
-    except client.NoSuchAuthenticationError:
+    except (client.NoSuchAuthenticationError, client.BadClientIdError):
         has_permission = False
     except client.TokenRefreshFailed:
         has_permission = False
         # Token refresh failed, so we should delete the authentication and force the user to re-authenticate.
-        extensions.backend.backend.delete_configuration_token(provider, profile_url, always_use_client_url)
+        extensions.backend.backend.delete_token_response(provider, profile_url, client_id)
 
     return jsonify({"has_permission": has_permission})
 
@@ -322,8 +298,9 @@ def align():
 
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)
-    use_client_id_document = flask.current_app.config["ALWAYS_USE_CLIENT_URL"]
-    cl = client.SolidClient(extensions.backend.backend, use_client_id_document=use_client_id_document)
+    cl = client.SolidClient(
+        extensions.backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"]
+    )
 
     print("Uploading file")
     if midi_type == "webmidi":

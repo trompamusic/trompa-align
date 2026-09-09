@@ -8,17 +8,12 @@ SECRET_KEY = os.getenv("TR_ALIGN_SECRET_KEY")
 SQLALCHEMY_DATABASE_URI = os.getenv("TR_ALIGN_SQLALCHEMY_DATABASE_URI")
 
 BASE_URL = os.getenv("TR_ALIGN_BASE_URL")
-REDIRECT_URL = os.path.join(BASE_URL, "auth/callback")
 REDIRECT_URL_BACKEND = os.path.join(BASE_URL, "api/auth/callback-backend")
-# When deployed on production, we can redirect to the react app (base url), or /api/auth/callback (API)
-REDIRECT_URLS = [REDIRECT_URL, BASE_URL, REDIRECT_URL_BACKEND]
+REDIRECT_URLS = [BASE_URL, REDIRECT_URL_BACKEND]
 
-# When accessing an OP, should you register a client ID ahead of time, or submit a URL?
-#  if the OP doesn't support client registration, it'll always submit a URL
-ALWAYS_USE_CLIENT_URL = os.getenv("TR_ALIGN_ALWAYS_USE_CLIENT_URL", "true").lower() == "true"
-CLIENT_ID_DOCUMENT_URL = os.getenv("TR_ALIGN_CLIENT_ID_DOCUMENT_URL", None)
-if ALWAYS_USE_CLIENT_URL and CLIENT_ID_DOCUMENT_URL is None:
-    raise ValueError("TR_ALIGN_CLIENT_ID_DOCUMENT_URL must be set if TR_ALIGN_ALWAYS_USE_CLIENT_URL is true")
+# If a client id document url is specified then use it with the oidc client
+# otherwise the client will use dynamic registration.
+CLIENT_ID_DOCUMENT_URL = os.getenv("TR_ALIGN_CLIENT_ID_DOCUMENT_URL") or None
 
 SENTRY_DSN = os.getenv("TR_ALIGN_SENTRY_DSN")
 
@@ -54,8 +49,8 @@ CLIENT_REGISTRATION_DATA = {
 }
 
 if LOCAL_DEV:
-    # React app on :3000 for js auth, and /auth/callback handler to send requests to the backend
-    CLIENT_REGISTRATION_DATA["redirect_uris"].extend(["http://localhost:3000", "http://localhost:3000/auth/callback"])
+    # Browser authentication returns to the React app.
+    CLIENT_REGISTRATION_DATA["redirect_uris"].extend(["http://localhost:3000"])
 
 # TODO: Dynamic registration from solid-oidc originally included these additional fields:
 #  grant_types: client_credentials  -  at least one provider (Redpencil) fails if we send this

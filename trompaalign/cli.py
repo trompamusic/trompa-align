@@ -6,9 +6,10 @@ from urllib.parse import urlparse
 import click
 import requests
 from trompaalign.extensions import db, backend
+from flask import current_app
 from flask.cli import AppGroup
 from solidauth import client, httpclient
-from solidauth.db import Base
+from solidauth.migrations import upgrade
 
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
@@ -45,22 +46,26 @@ db_bp = AppGroup("db", help="Database commands")
 
 @db_bp.command("create-database")
 def cmd_create_database():
-    """Create a user in the database"""
-    # This doesn't use the Flask-SQLAlchemy create_all method, as we have other
-    # tables that aren't part of that extension's declarative base
+    """Create application and authentication database tables."""
     print("Creating database tables...")
     db.create_all()
-    Base.metadata.create_all(db.engine)
+    upgrade(db.engine)
     print("Done")
+
+
+@db_bp.command("upgrade")
+def cmd_upgrade_database():
+    """Apply authentication database migrations."""
+    upgrade(db.engine)
+    click.echo("Database upgraded")
 
 
 @cli.command("list-pod")
 @click.argument("profile")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_list_containers_in_pod(profile, use_client_id_document):
+def cmd_list_containers_in_pod(profile):
     """List containers in a pod."""
     print(f"Looking up data for profile {profile}")
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
@@ -83,8 +88,7 @@ def cmd_list_containers_in_pod(profile, use_client_id_document):
 @click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("container")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_list_container(use_json, profile, container, use_client_id_document):
+def cmd_list_container(use_json, profile, container):
     """Get the contents of a container"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -98,7 +102,7 @@ def cmd_list_container(use_json, profile, container, use_client_id_document):
 
     print(f"Storage: {storage}")
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     if use_json:
         response = get_pod_listing(cl, provider, profile, container)
         print(json.dumps(response, indent=2))
@@ -113,8 +117,7 @@ def cmd_list_container(use_json, profile, container, use_client_id_document):
 
 @cli.command("list-clara")
 @click.argument("profile")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_check_pod_for_clara(profile, use_client_id_document):
+def cmd_check_pod_for_clara(profile):
     """List clara content in a pod.
 
     If a pod has a clara directory, list the items in it.
@@ -132,7 +135,7 @@ def cmd_check_pod_for_clara(profile, use_client_id_document):
 
     print(f"Storage: {storage}")
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
     listing = get_pod_listing(cl, provider, profile, clara_container)
     print(json.dumps(listing, indent=2))
@@ -148,8 +151,7 @@ def cmd_check_pod_for_clara(profile, use_client_id_document):
 
 @cli.command("create-clara")
 @click.argument("profile")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_add_clara_to_pod(profile, use_client_id_document):
+def cmd_add_clara_to_pod(profile):
     """Create the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -161,7 +163,7 @@ def cmd_add_clara_to_pod(profile, use_client_id_document):
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     create_clara_container(cl, provider, profile, storage)
 
 
@@ -169,8 +171,7 @@ def cmd_add_clara_to_pod(profile, use_client_id_document):
 @click.option("--json/--ttl", "use_json", default=True)
 @click.argument("profile")
 @click.argument("resource")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_get_resource(use_json, profile, resource, use_client_id_document):
+def cmd_get_resource(use_json, profile, resource):
     """Get a resource"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -178,7 +179,7 @@ def cmd_get_resource(use_json, profile, resource, use_client_id_document):
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     if use_json:
         type_headers = {"Accept": "application/ld+json"}
@@ -198,23 +199,21 @@ def cmd_get_resource(use_json, profile, resource, use_client_id_document):
 @click.argument("container")
 @click.argument("item")
 @click.argument("title")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_patch_container_title(profile, container, item, title, use_client_id_document):
+def cmd_patch_container_title(profile, container, item, title):
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     patch_container_item_title(cl, provider, profile, container, item, title)
 
 
 @cli.command("get-score-for-url")
 @click.argument("profile")
 @click.argument("score_url")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_get_score_for_url(profile, score_url, use_client_id_document):
+def cmd_get_score_for_url(profile, score_url):
     """Find the score container for a given score external URL"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -226,7 +225,7 @@ def cmd_get_score_for_url(profile, score_url, use_client_id_document):
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     score = find_score_for_external_uri(cl, provider, profile, storage, score_url)
     if score:
         print(f"External MEI URL is in this user's solid pod as {score}")
@@ -235,8 +234,7 @@ def cmd_get_score_for_url(profile, score_url, use_client_id_document):
 @cli.command("delete-clara")
 @click.argument("profile")
 @click.option("-c", "--container")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_delete_clara_container_from_pod(profile, container, use_client_id_document):
+def cmd_delete_clara_container_from_pod(profile, container):
     """Delete the base clara Container in a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -248,7 +246,7 @@ def cmd_delete_clara_container_from_pod(profile, container, use_client_id_docume
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     if container is None:
         clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
     else:
@@ -265,8 +263,7 @@ def cmd_delete_clara_container_from_pod(profile, container, use_client_id_docume
 @cli.command("delete")
 @click.argument("profile")
 @click.argument("resource")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_delete_resource(profile, resource, use_client_id_document):
+def cmd_delete_resource(profile, resource):
     """Delete an item from a pod"""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
@@ -274,7 +271,7 @@ def cmd_delete_resource(profile, resource, use_client_id_document):
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     delete_resource(cl, provider, profile, resource)
 
 
@@ -283,8 +280,7 @@ def cmd_delete_resource(profile, resource, use_client_id_document):
 @click.option("--url", default=None)
 @click.option("--file", default=None)
 @click.option("--title", default=None)
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_score_to_pod(profile, url, file, title, use_client_id_document):
+def cmd_upload_score_to_pod(profile, url, file, title):
     """Upload an MEI score to a pod"""
     print(f"Looking up data for profile {profile}")
 
@@ -315,7 +311,7 @@ def cmd_upload_score_to_pod(profile, url, file, title, use_client_id_document):
         r.raise_for_status()
         payload = r.text
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     title = get_title_from_mei(payload, filename)
     mei_copy_uri = upload_mei_to_pod(cl, provider, profile, storage, payload)
 
@@ -325,8 +321,7 @@ def cmd_upload_score_to_pod(profile, url, file, title, use_client_id_document):
 @cli.command("upload-webmidi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_webmidi_to_pod(profile, file, use_client_id_document):
+def cmd_upload_webmidi_to_pod(profile, file):
     """Upload a webmidi performance to a pod, convert to midi, and upload the midi"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -339,7 +334,7 @@ def cmd_upload_webmidi_to_pod(profile, file, use_client_id_document):
 
     payload = open(file, "rb").read()
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     resource = upload_webmidi_to_pod(cl, provider, profile, storage, payload)
     print(f"Uploaded: {resource}")
 
@@ -347,8 +342,7 @@ def cmd_upload_webmidi_to_pod(profile, file, use_client_id_document):
 @cli.command("upload-midi")
 @click.argument("profile")
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_upload_midi_to_pod(profile, file, use_client_id_document):
+def cmd_upload_midi_to_pod(profile, file):
     """Upload a midi performance to a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -361,7 +355,7 @@ def cmd_upload_midi_to_pod(profile, file, use_client_id_document):
 
     payload = open(file, "rb").read()
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     resource = upload_midi_to_pod(cl, provider, profile, storage, payload)
     print(f"Uploaded: {resource}")
 
@@ -370,8 +364,7 @@ def cmd_upload_midi_to_pod(profile, file, use_client_id_document):
 @click.argument("profile")
 @click.argument("resource")
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def add_turtle(profile, resource, file, use_client_id_document):
+def add_turtle(profile, resource, file):
     """Upload any file to a pod with text/turtle content type"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -384,7 +377,7 @@ def add_turtle(profile, resource, file, use_client_id_document):
 
     payload = open(file, "rb").read()
     print(f"Uploading file {resource}")
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "text/turtle"
     r = httpclient.put(resource, data=payload, headers=headers)
@@ -395,8 +388,7 @@ def add_turtle(profile, resource, file, use_client_id_document):
 @click.argument("profile")
 @click.argument("resource")
 @click.argument("file", type=click.Path(exists=True))
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def add_jsonld(profile, resource, file, use_client_id_document):
+def add_jsonld(profile, resource, file):
     """Upload any file to a pod with application/ld+json content type"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -409,7 +401,7 @@ def add_jsonld(profile, resource, file, use_client_id_document):
 
     payload = open(file, "rb").read()
     print(f"Uploading file {resource}")
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
     headers["content-type"] = "application/ld+json"
     r = httpclient.put(resource, data=payload, headers=headers)
@@ -420,8 +412,7 @@ def add_jsonld(profile, resource, file, use_client_id_document):
 @click.argument("profile")
 @click.argument("resource")
 @click.option("--save", is_flag=True, help="Save to local file (basename of resource)")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def get_file(profile, resource, save, use_client_id_document):
+def get_file(profile, resource, save):
     """Get any file from a pod"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -433,7 +424,7 @@ def get_file(profile, resource, save, use_client_id_document):
         return
 
     print(f"Getting file {resource}")
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
     r = httpclient.get(resource, headers=headers)
     r.raise_for_status()
@@ -450,8 +441,7 @@ def get_file(profile, resource, save, use_client_id_document):
 @cli.command("options")
 @click.argument("profile")
 @click.argument("resource")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_options(profile, resource, use_client_id_document):
+def cmd_options(profile, resource):
     """run HTTP OPTIONS on a resource"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -459,7 +449,7 @@ def cmd_options(profile, resource, use_client_id_document):
         return
 
     print(f"Running OPTIONS on {resource}")
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers, content = http_options(cl, provider, profile, resource)
     for h, v in headers.items():
         print(f"{h}: {v}")
@@ -491,8 +481,7 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
 @cli.command("add-score-to-list")
 @click.argument("profile")
 @click.argument("score_url")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_add_score_to_list(profile, score_url, use_client_id_document):
+def cmd_add_score_to_list(profile, score_url):
     """Add a score URL to the score list"""
     provider = lookup_provider_from_profile(profile)
     if not provider:
@@ -503,7 +492,7 @@ def cmd_add_score_to_list(profile, score_url, use_client_id_document):
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     try:
         added = add_score_to_list(cl, provider, profile, storage, score_url)
         if added:
@@ -518,8 +507,7 @@ def cmd_add_score_to_list(profile, score_url, use_client_id_document):
 
 @cli.command("update-score-list")
 @click.argument("profile")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_update_score_list(profile, use_client_id_document):
+def cmd_update_score_list(profile):
     """Scan the user's scores/ container and update the score list with public URLs.
 
     Reads all score description resources in the Clara scores container, extracts mo:published_as URLs,
@@ -535,7 +523,7 @@ def cmd_update_score_list(profile, use_client_id_document):
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     urls = list_external_score_urls(cl, provider, profile, storage)
     if not urls:
         print("No external score URLs found in scores/ container")
@@ -552,8 +540,7 @@ def cmd_update_score_list(profile, use_client_id_document):
     help="Also delete scores with no performances even if they are unique (count == 1)",
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be deleted without actually deleting anything")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_delete_duplicate_scores(profile, delete_empty_scores, dry_run, use_client_id_document):
+def cmd_delete_duplicate_scores(profile, delete_empty_scores, dry_run):
     """Delete duplicate scores from the scores/ container.
 
     Deletes scores that have no performances. By default, only deletes duplicates
@@ -573,7 +560,7 @@ def cmd_delete_duplicate_scores(profile, delete_empty_scores, dry_run, use_clien
         print("Cannot find storage, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     deleted_count = delete_duplicate_scores(
         cl, provider, profile, storage, delete_empty_scores=delete_empty_scores, dry_run=dry_run
     )
@@ -587,9 +574,8 @@ def cmd_delete_duplicate_scores(profile, delete_empty_scores, dry_run, use_clien
 @click.argument("profile")
 @click.argument("local_directory", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.argument("remote_uri")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
 @click.option("--debug", is_flag=True, help="Debug mode: show what would be uploaded without actually uploading")
-def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_client_id_document, debug):
+def cmd_recursive_upload_directory(profile, local_directory, remote_uri, debug):
     """Recursively upload a local directory to a Solid pod.
 
     This command will:
@@ -615,7 +601,7 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_cli
             print("Cannot find provider, quitting")
             return
         print(f"Uploading directory {local_directory} to {remote_uri}")
-        cl = client.SolidClient(backend.backend, use_client_id_document)
+        cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
 
     try:
         batch_upload.recursive_upload_directory(cl, provider, profile, local_directory, remote_uri, debug=debug)
@@ -631,8 +617,7 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, use_cli
 @click.argument("resource")
 @click.option("--public/--private", "is_public", default=None, help="Set resource ACL to public-read or private")
 @click.option("--remove", is_flag=True, help="Delete the ACL resource for the target")
-@click.option("--use-client-id-document", is_flag=True, help="Use client ID document instead of dynamic registration")
-def cmd_set_permissions(profile, resource, is_public, remove, use_client_id_document):
+def cmd_set_permissions(profile, resource, is_public, remove):
     """Set ACL permissions of a resource to public-read or private.
 
     Public: owner Control/Read/Write, public Read
@@ -644,7 +629,7 @@ def cmd_set_permissions(profile, resource, is_public, remove, use_client_id_docu
         print("Cannot find provider, quitting")
         return
 
-    cl = client.SolidClient(backend.backend, use_client_id_document)
+    cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
 
     # Validate option combinations
     if remove and is_public is not None:
