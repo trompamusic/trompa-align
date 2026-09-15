@@ -65,7 +65,7 @@ Apply authentication database migrations:
 We provide a CLI that allows you to perform all steps of the clara workflow.
 
 In these commands, `USERS-PROFILE` is the URL to the web id of a user who has been
-authenticated by this app to act on the user's behalf
+authenticated by this app to act on the user's behalf.
 
 ### general solid commands
 
@@ -85,7 +85,7 @@ Get the contents of a container. Specify to get the response in turtle or json-l
 
     flask solid list-container USERS-PROFILE CONTAINER-ON-POD
 
-Recursively list a user's entire pod
+List the top-level containers in a user's pod (not recursive)
 
     flask solid list-pod USERS-PROFILE
 
@@ -101,14 +101,24 @@ Get a file with no requested content-type
 
     flask solid get-file USERS-PROFILE RESOURCE
 
+Save a single file, including binary files, using its basename in the current directory
+(overwrites an existing file with that name):
+
+    flask solid get-file --save USERS-PROFILE RESOURCE
+
+Download all files in a container recursively into a local directory:
+
+    uv run flask solid recursive-get USERS-PROFILE CONTAINER-ON-POD LOCAL-DIRECTORY
+
+Delete a container and all its contents recursively. Supply the full container URL;
+there is no default container:
+
+    flask solid recursive-delete USERS-PROFILE CONTAINER-ON-POD
+
 
 ### clara steps
 
 Create the base clara structure in a user's pod:
-
-    flask solid create-clara USERS-PROFILE
-
-Recursively delete the clara structure
 
     flask solid create-clara USERS-PROFILE
 

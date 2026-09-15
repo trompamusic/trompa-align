@@ -3,7 +3,10 @@ from dataclasses import dataclass
 import io
 import json
 import logging
+import mimetypes
 import os
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
 import uuid
 
 import rdflib
@@ -13,7 +16,7 @@ import requests
 import requests.utils
 from pyld import jsonld
 from rdflib import URIRef
-from solidauth import httpclient
+from solidauth import client, httpclient
 from solidauth.solid import RdfFetchError, fetch_graph
 
 from scripts.convert_to_rdf import generate_structural_segmentation, score_to_graph, segmentation_to_graph
@@ -39,6 +42,7 @@ jsonld_context = {
 
 
 CLARA_CONTAINER_NAME = "at.ac.mdw.trompa/"
+LDP = rdflib.Namespace("http://www.w3.org/ns/ldp#")
 
 
 def is_lock_expired_response(resp: requests.Response) -> bool:
@@ -108,18 +112,13 @@ def http_options(solid_client, provider, profile, container):
 
 
 def get_pod_listing(solid_client, provider, profile, storage):
-    headers = solid_client.get_bearer_for_user(provider, profile, storage, "GET")
-    data, headers = get_uri_jsonld(storage, headers)
-    if data is not None:
-        compact = jsonld.compact(data, jsonld_context)
-        return compact
-    else:
-        return None
+    response = get_pod_response(solid_client, provider, profile, storage, accept="application/ld+json")
+    data = response.json()
+    return jsonld.compact(data, jsonld_context) if data is not None else None
 
 
 def get_pod_listing_ttl(solid_client, provider, profile, storage):
-    headers = solid_client.get_bearer_for_user(provider, profile, storage, "GET")
-    return get_uri_ttl(storage, headers)
+    return get_pod_response(solid_client, provider, profile, storage, accept="text/turtle").text
 
 
 def _parse_acl_link_from_headers(headers):
@@ -420,61 +419,208 @@ def patch_container_item_title(solid_client, provider, profile, container, item,
     print(f"Status: {r.status_code}")
 
 
+def parse_pod_graph(data, base_uri):
+    """Parse JSON-LD or Turtle, or reuse an existing RDF graph."""
+    if isinstance(data, rdflib.Graph):
+        return data
+    is_json = isinstance(data, (dict, list))
+    return rdflib.Graph().parse(
+        data=json.dumps(data) if is_json else data,
+        format="json-ld" if is_json else "turtle",
+        publicID=base_uri,
+    )
+
+
 def get_contents_of_container(container, container_name):
-    contents = []
-    # Handle empty containers or invalid input - if container is not a dict or @graph doesn't exist, return empty list
-    if not isinstance(container, dict) or "@graph" not in container:
-        return contents
-    for item in container["@graph"]:
-        # This returns 1 item for the actual url, which has ldp:contains: [list, of items]
-        # but then also enumerates the list of items
-        if item["@id"] == container_name:
-            contains = item.get("ldp:contains")
-            if not contains:
-                continue
-            if not isinstance(contains, list):
-                contains = [contains]
-            for cont in contains:
-                contents.append(cont["@id"])
-    return contents
+    """Extract member URLs from JSON-LD, Turtle or an RDF graph; reject invalid members."""
+    graph = parse_pod_graph(container, container_name)
+    subject = URIRef(container_name)
+    members = list(graph.objects(subject, LDP.contains))
+    if any(not isinstance(member, URIRef) for member in members):
+        raise ValueError(f"Container member is not a URL: {container_name}")
+    return sorted(str(member) for member in members)
 
 
-def get_contents_of_container_rdf(container_jsonld, container_name: str) -> list[str]:
-    """Extract contained resource URIs from a container JSON-LD using rdflib.
+def list_container(solid_client, provider, profile, container):
+    """Fetch and parse the direct members of a container."""
+    listing = get_pod_listing_ttl(solid_client, provider, profile, container)
+    return get_contents_of_container(listing, container)
 
-    - Validates that the subject is an LDP Container (Container or BasicContainer)
-    - Returns a list of contained resource URIs via ldp:contains
+
+def _local_name(encoded_name):
+    name = unquote(encoded_name)
+    if not name or name in (".", "..") or any(char in name for char in ("/", "\\", "\0")):
+        raise ValueError(f"Unsafe local filename: {encoded_name}")
+    return name
+
+
+def container_basename(container):
+    """Return the decoded container basename, using the hostname for a pod root."""
+    url = urlsplit(container)
+    basename = url.path.rstrip("/").rsplit("/", 1)[-1]
+    return _local_name(basename or url.hostname or "")
+
+
+def container_member_name(container, resource):
+    """Validate a direct member URL and return its decoded filename."""
+    parent, child = urlsplit(container), urlsplit(resource)
+    if (
+        (child.scheme, child.netloc) != (parent.scheme, parent.netloc)
+        or child.query
+        or child.fragment
+        or not child.path.startswith(parent.path)
+    ):
+        raise ValueError(f"Resource is outside its container: {resource}")
+    return _local_name(child.path[len(parent.path) :].removesuffix("/"))
+
+
+def _with_trailing_slash(uri: str) -> str:
+    return uri if uri.endswith("/") else uri + "/"
+
+
+def container_exists(solid_client: client.SolidClient, provider: str, profile: str, container_uri: str) -> bool:
+    """Return True if the LDP container exists, False if not.
+
+    Tries HEAD first, then falls back to GET with Accept: text/turtle.
     """
-    LDP = rdflib.Namespace("http://www.w3.org/ns/ldp#")
-    print(json.dumps(container_jsonld, indent=2))
+    uri = _with_trailing_slash(container_uri)
     try:
-        g = rdflib.Graph()
-        g.parse(data=json.dumps(container_jsonld), format="json-ld")
-        subject = rdflib.URIRef(container_name)
+        headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
+        r = httpclient.head(uri, headers=headers)
+        if r.status_code == 404:
+            return False
+        if r.ok:
+            return True
+    except Exception:
+        pass
 
-        # Validate container type
-        is_container = (subject, RDF.type, LDP.Container) in g or (subject, RDF.type, LDP.BasicContainer) in g
-        if not is_container:
-            return []
+    try:
+        headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
+        headers.update({"Accept": "text/turtle"})
+        r = httpclient.get(uri, headers=headers)
+        if r.status_code == 404:
+            return False
+        if r.ok:
+            return True
+    except Exception:
+        pass
 
-        # Collect contained resources
-        contents: list[str] = []
-        for o in g.objects(subject, LDP.contains):
-            if isinstance(o, rdflib.term.Node):
-                contents.append(str(o))
-        return contents
-    except Exception as e:
-        print("Exception", e)
-        return []
+    return False
+
+
+def get_content_type(file_path: str) -> str | None:
+    """
+    Determine the content type for a file based on its extension.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        Content type string or None if not specified
+    """
+    filename = os.path.basename(file_path)
+
+    # Handle special case for files ending with $.ext
+    if "$." in filename:
+        # Extract extension after $
+        parts = filename.split("$.")
+        if len(parts) > 1:
+            ext = parts[-1].lower()
+            if ext == "xml":
+                return "text/xml"
+            elif ext == "ttl":
+                return "text/turtle"
+            # For other extensions, return None (omit content-type)
+            return None
+    if filename.endswith(".jsonld"):
+        return "application/ld+json"
+
+    # For regular files, use mimetypes
+    content_type, _ = mimetypes.guess_type(file_path)
+    return content_type
+
+
+def clean_remote_filename(filename: str) -> str:
+    """
+    Clean the filename for remote storage by removing the $ extension pattern.
+
+    Args:
+        filename: Original filename
+
+    Returns:
+        Cleaned filename
+    """
+    if "$." in filename:
+        # Remove everything from $. onwards
+        return filename.split("$.")[0]
+    return filename
+
+
+def upload_file_to_pod(
+    solid_client: client.SolidClient, provider: str, profile: str, local_file_path: str, remote_uri: str
+):
+    """
+    Upload a single file to the pod.
+
+    Args:
+        solid_client: The Solid client instance
+        provider: The provider URL
+        profile: The profile URL
+        local_file_path: Path to the local file
+        remote_uri: URI where the file should be uploaded
+    """
+    print(f"Uploading file {local_file_path} to {remote_uri}")
+
+    headers = solid_client.get_bearer_for_user(provider, profile, remote_uri, "PUT")
+
+    # Read file content
+    with open(local_file_path, "rb") as f:
+        content = f.read()
+
+    # Set content type
+    content_type = get_content_type(local_file_path)
+    if content_type:
+        headers["content-type"] = content_type
+
+    r = httpclient.put(remote_uri, data=content, headers=headers)
+    try:
+        r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if is_lock_expired_response(r):
+            print(f"Warning: provider lock timeout, treating as success for {remote_uri}")
+        else:
+            print(f"Error uploading {remote_uri}: {e}")
+            print(f"Response: {r.text}")
+            raise
+    print(f"Uploaded: {remote_uri}")
+
+
+def get_pod_response(solid_client, provider, profile, uri, accept=None):
+    """Fetch an authenticated resource using the HTTP client's default redirect handling."""
+    headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
+    if accept:
+        headers["Accept"] = accept
+    response = httpclient.get(uri, headers=headers)
+    response.raise_for_status()
+    return response
 
 
 def get_resource_from_pod(solid_client, provider, profile, uri, accept=None):
-    headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
-    if accept:
-        headers.update({"Accept": accept})
-    r = httpclient.get(uri, headers=headers)
-    r.raise_for_status()
-    return r.content
+    return get_pod_response(solid_client, provider, profile, uri, accept).content
+
+
+def save_resource_from_pod(solid_client, provider, profile, uri, destination, *, overwrite=True):
+    """Fetch bytes and save them, optionally requiring a new destination file."""
+    destination = Path(destination)
+    content = get_resource_from_pod(solid_client, provider, profile, uri)
+    output = destination.open("wb" if overwrite else "xb")
+    try:
+        with output:
+            output.write(content)
+    except BaseException:
+        if not overwrite:
+            destination.unlink()
+        raise
 
 
 def create_clara_container(solid_client, provider, profile, storage):
@@ -591,7 +737,7 @@ def upload_mp3_to_pod(solid_client, provider, profile, resource, payload: bytes)
 def find_score_for_external_uri(solid_client, provider, profile, storage, mei_external_uri):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores/")
     score_listing = get_pod_listing(solid_client, provider, profile, resource)
-    contents = get_contents_of_container_rdf(score_listing, resource)
+    contents = get_contents_of_container(score_listing, resource)
     for item in contents:
         file = get_resource_from_pod(solid_client, provider, profile, item)
         graph = rdflib.Graph()
@@ -707,8 +853,7 @@ def list_performance_urls(solid_client, provider, profile, storage, performances
         performances_container: the URI of the performances container (from Score.performances_container)
     """
 
-    contents = get_contents_of_container(performances_container, performances_container)
-    return contents
+    return list_container(solid_client, provider, profile, performances_container)
 
 
 @dataclass
@@ -845,10 +990,7 @@ def _get_score_list(solid_client, provider, profile, storage):
     """
     score_data_resource = os.path.join(storage, CLARA_CONTAINER_NAME, "scores-list")
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, score_data_resource, "GET")
-        headers["Accept"] = "text/turtle"
-        r = httpclient.get(score_data_resource, headers=headers)
-        r.raise_for_status()
+        r = get_pod_response(solid_client, provider, profile, score_data_resource, accept="text/turtle")
         etag = r.headers.get("ETag")
         graph = rdflib.Graph()
         graph.parse(data=r.text, format="n3")
@@ -1030,34 +1172,23 @@ def save_performance_timeline(solid_client, provider, profile, timeline_uri, tim
 
 
 def recursive_delete_from_pod(solid_client, provider, profile, container):
-    """
-    A container listing has 2 types of data returned from a query:
-     - the information about the container itself (has an ldp:contains section with
-         all items in that container)
-     - the information about each item in ldp:contains (including its @type)
-
-    So, we loop through all items. If it's an ldp:Container (and not the main ID), recurse into it
-    otherwise, just delete it.
-    After recursing into it, delete the container itself, as it'll be empty.
-    """
+    """Delete resources described by the listing, recursing into RDF-typed containers."""
     listing = get_pod_listing(solid_client, provider, profile, container)
     if listing is None:
-        # If listing is None, just delete the container itself
         delete_resource(solid_client, provider, profile, container)
         return
-    for item in listing.get("@graph", []):
-        item_id = item["@id"]
-        # First item is ourselves, skip it
-        if item_id == container:
+    graph = parse_pod_graph(listing, container)
+    for resource in graph.subjects(unique=True):
+        if resource == URIRef(container):
             continue
-        if "ldp:Container" in item["@type"]:
-            # If the container has other containers, delete them
-            recursive_delete_from_pod(solid_client, provider, profile, item["@id"])
+        types = set(graph.objects(resource, RDF.type))
+        if not types:
+            raise ValueError(f"Missing RDF type for resource: {resource}")
+        if LDP.Container in types:
+            recursive_delete_from_pod(solid_client, provider, profile, str(resource))
         else:
-            # Otherwise it's just a file, delete it.
-            print(f"Delete file {item_id}")
-            delete_resource(solid_client, provider, profile, item_id)
-    # Finally, delete the container itself
+            print(f"Delete file {resource}")
+            delete_resource(solid_client, provider, profile, str(resource))
     delete_resource(solid_client, provider, profile, container)
 
 

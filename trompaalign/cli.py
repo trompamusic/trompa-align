@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import click
 import requests
+from rdflib.namespace import RDF
 from trompaalign.extensions import db, backend
 from flask import current_app
 from flask.cli import AppGroup
@@ -13,6 +14,7 @@ from solidauth.migrations import upgrade
 
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
+    LDP,
     add_score_to_list,
     create_and_save_structure,
     create_clara_container,
@@ -23,12 +25,15 @@ from trompaalign.solid import (
     get_contents_of_container,
     get_pod_listing,
     get_pod_listing_ttl,
+    get_pod_response,
     get_storage_from_profile,
     get_title_from_mei,
     http_options,
     lookup_provider_from_profile,
     patch_container_item_title,
+    parse_pod_graph,
     recursive_delete_from_pod,
+    save_resource_from_pod,
     delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
@@ -37,7 +42,7 @@ from trompaalign.solid import (
     upload_midi_to_pod,
     upload_webmidi_to_pod,
 )
-from trompaalign import batch_upload
+from trompaalign import batch
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -79,9 +84,9 @@ def cmd_list_containers_in_pod(profile):
     print("Pod containers:")
     print(f"{provider=} {profile=}")
     listing = get_pod_listing(cl, provider, profile, storage)
-    for item in listing["@graph"]:
-        if "ldp:BasicContainer" in item.get("@type", []):
-            print(" ", item.get("@id"))
+    graph = parse_pod_graph(listing, storage)
+    for resource in graph.subjects(RDF.type, LDP.BasicContainer):
+        print(" ", resource)
 
 
 @cli.command("list-container")
@@ -180,14 +185,8 @@ def cmd_get_resource(use_json, profile, resource):
         return
 
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
-    headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
-    if use_json:
-        type_headers = {"Accept": "application/ld+json"}
-    else:
-        type_headers = {"Accept": "text/turtle"}
-    headers.update(type_headers)
-    r = httpclient.get(resource, headers=headers)
-    r.raise_for_status()
+    accept = "application/ld+json" if use_json else "text/turtle"
+    r = get_pod_response(cl, provider, profile, resource, accept=accept)
     if use_json:
         print(json.dumps(r.json(), indent=2))
     else:
@@ -231,33 +230,18 @@ def cmd_get_score_for_url(profile, score_url):
         print(f"External MEI URL is in this user's solid pod as {score}")
 
 
-@cli.command("delete-clara")
+@cli.command("recursive-delete")
 @click.argument("profile")
-@click.option("-c", "--container")
-def cmd_delete_clara_container_from_pod(profile, container):
-    """Delete the base clara Container in a pod"""
+@click.argument("container")
+def cmd_recursive_delete(profile, container):
+    """Delete CONTAINER and its contents recursively. CONTAINER is a full URL."""
     print(f"Looking up data for profile {profile}")
     provider = lookup_provider_from_profile(profile)
     if not provider:
         print("Cannot find provider, quitting")
         return
-    storage = get_storage_from_profile(profile)
-    if not storage:
-        print("Cannot find storage, quitting")
-        return
-
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
-    if container is None:
-        clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    else:
-        clara_container = os.path.join(storage, container)
-    listing = get_pod_listing(cl, provider, profile, clara_container)
-    if listing is None:
-        print("Pod has no clara storage, quitting")
-        return
-
-    # To delete, we need to recursively delete everything one by one
-    recursive_delete_from_pod(cl, provider, profile, clara_container)
+    recursive_delete_from_pod(cl, provider, profile, container)
 
 
 @cli.command("delete")
@@ -425,17 +409,32 @@ def get_file(profile, resource, save):
 
     print(f"Getting file {resource}")
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
-    headers = cl.get_bearer_for_user(provider, profile, resource, "GET")
-    r = httpclient.get(resource, headers=headers)
-    r.raise_for_status()
     if save:
         parsed = urlparse(resource)
         filename = os.path.basename(parsed.path) or "index"
-        with open(filename, "wb") as f:
-            f.write(r.content)
+        save_resource_from_pod(cl, provider, profile, resource, filename, overwrite=True)
         print(f"Saved to {filename}")
     else:
-        print(r.text)
+        print(get_pod_response(cl, provider, profile, resource).text)
+
+
+@cli.command("recursive-get")
+@click.argument("profile")
+@click.argument("remote_uri")
+@click.argument("local_directory", type=click.Path(file_okay=False))
+def cmd_recursive_get(profile, remote_uri, local_directory):
+    """Download REMOTE_URI recursively to LOCAL_DIRECTORY."""
+    try:
+        provider = lookup_provider_from_profile(profile)
+        if not provider:
+            raise click.ClickException("Cannot find provider for profile")
+        cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
+        count = batch.recursive_get(cl, provider, profile, remote_uri, local_directory)
+    except click.ClickException:
+        raise
+    except Exception as exc:
+        raise click.ClickException(f"Download failed: {exc}") from exc
+    click.echo(f"Downloaded {count} file(s) to {local_directory}")
 
 
 @cli.command("options")
@@ -589,11 +588,8 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, debug):
     if debug:
         print(f"DEBUG: Analyzing directory {local_directory} for upload to {remote_uri}")
         print("DEBUG: Skipping profile validation in debug mode")
-        # In debug mode, we don't need to validate the profile or create a client
-        # We'll create a mock client just to pass to the function
         cl = None
         provider = "debug-provider"
-        profile = profile
     else:
         print(f"Looking up data for profile {profile}")
         provider = lookup_provider_from_profile(profile)
@@ -604,7 +600,7 @@ def cmd_recursive_upload_directory(profile, local_directory, remote_uri, debug):
         cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
 
     try:
-        batch_upload.recursive_upload_directory(cl, provider, profile, local_directory, remote_uri, debug=debug)
+        batch.recursive_upload_directory(cl, provider, profile, local_directory, remote_uri, debug=debug)
         if not debug:
             print("Upload completed successfully")
     except Exception as e:
