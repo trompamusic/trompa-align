@@ -4,6 +4,9 @@ Comprehensive test suite for score_to_graph function to ensure behavior is prese
 during refactoring from mixed string/rdflib approach to pure rdflib approach.
 """
 
+from rdflib import Graph
+from rdflib.compare import isomorphic
+
 from scripts.convert_to_rdf import score_to_graph
 
 
@@ -58,56 +61,38 @@ class TestScoreToGraph:
             expansions=expansions,
         )
 
-        # Use longturtle because the output is more deterministic
-        # TODO: longturtle doesn't seem to use our bound namespace aliases for meld and mo, but it does for
-        #  ones that are built in to rdflib (skos, dcterms). "n3" and "turtle" do, so likely a bug in longturtle.
-        #  https://github.com/RDFLib/rdflib/issues/3105
-        turtle_output = graph.serialize(format="longturtle")
+        # Compare graphs rather than serialised text: the blank nodes used for expansionNoteCount
+        # are emitted in a non-deterministic order by every serialiser, so a string comparison is flaky.
+        expected = Graph()
+        expected.parse(
+            format="turtle",
+            data="""
+            PREFIX dcterms: <http://purl.org/dc/terms/>
+            PREFIX meld: <https://meld.linkedmusic.org/terms/>
+            PREFIX mo: <http://purl.org/ontology/mo/>
+            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
-        expected = (
-            """PREFIX dcterms: <http://purl.org/dc/terms/>
-PREFIX ns1: <https://meld.linkedmusic.org/terms/>
-PREFIX ns2: <http://purl.org/ontology/mo/>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+            <http://example.org/mei/copy/1>
+                a mo:PublishedScore ;
+                skos:exactMatch <http://example.org/mei/1> .
 
-<http://example.org/mei/copy/1>
-    a ns2:PublishedScore ;
-    skos:exactMatch <http://example.org/mei/1> ;
-.
+            <http://example.org/mei/1> a mo:PublishedScore .
 
-<http://example.org/score/1>
-    a ns2:Score ;
-    dcterms:title "Test Score" ;
-    ns2:published_as <http://example.org/mei/1> ;
-    skos:related <http://example.org/performance/1> ;
-    ns1:expansion
-        "expansion-default" ,
-        "expansion-minimal" ,
-        "expansion-nested" ;
-    ns1:expansionNoteCount """  # Whitespace is significant here, so split into two strings
-            + """
-        [
-            ns1:expansionId "expansion-minimal" ;
-            ns1:noteCount 60 ;
-        ] ,
-        [
-            ns1:expansionId "expansion-nested" ;
-            ns1:noteCount 180 ;
-        ] ,
-        [
-            ns1:expansionId "expansion-default" ;
-            ns1:noteCount 120 ;
-        ] ;
-    ns1:segments <http://example.org/segments/1> ;
-.
-
-<http://example.org/mei/1>
-    a ns2:PublishedScore ;
-.
-"""
+            <http://example.org/score/1>
+                a mo:Score ;
+                dcterms:title "Test Score" ;
+                mo:published_as <http://example.org/mei/1> ;
+                skos:related <http://example.org/performance/1> ;
+                meld:segments <http://example.org/segments/1> ;
+                meld:expansion "expansion-default", "expansion-minimal", "expansion-nested" ;
+                meld:expansionNoteCount
+                    [ meld:expansionId "expansion-default" ; meld:noteCount 120 ],
+                    [ meld:expansionId "expansion-minimal" ; meld:noteCount 60 ],
+                    [ meld:expansionId "expansion-nested" ; meld:noteCount 180 ] .
+            """,
         )
-        assert expected == turtle_output
+
+        assert isomorphic(expected, graph)
 
     def test_special_characters_in_title(self):
         special_title = "Test \"Score\" with & special <characters> and 'quotes'"
