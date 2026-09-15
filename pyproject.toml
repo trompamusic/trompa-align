@@ -37,6 +37,7 @@ dependencies = [
 dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.5",
+    "ty>=0.0.81",
 ]
 prod = [
   "gunicorn"
@@ -51,3 +52,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 ignore = ["E741"]
+
+[tool.ty.src]
+include = ["trompaalign", "scripts", "app.py", "config.py"]
+
+[tool.ty.rules]
+# os.system in scripts/smat_align.py is soft-deprecated, not an error.
+deprecated = "ignore"

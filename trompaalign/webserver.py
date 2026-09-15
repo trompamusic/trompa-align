@@ -12,7 +12,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client, httpclient
 from solidauth.solid import ProviderConfigurationError
-import solidauth
+import solidauth.solid
 
 from trompaalign import celery_serializers  # noqa: F401
 from trompaalign import extensions, tasks
@@ -275,8 +275,12 @@ def add_score_status():
 
 @webserver_bp.route("/api/add", methods=["POST"])
 def add_score():
-    score_url = request.json.get("score")
-    profile = request.json.get("profile")
+    body = request.get_json()
+    if not isinstance(body, dict):
+        return jsonify({"status": "error", "message": "Request body must be a JSON object"}), 400
+
+    score_url = body.get("score")
+    profile = body.get("profile")
 
     if not score_url:
         return jsonify({"status": "error", "message": "Missing `score` parameter"}), 400
@@ -290,11 +294,17 @@ def add_score():
 @webserver_bp.route("/api/align", methods=["POST"])
 def align():
     file = request.files.get("file")
+    if file is None:
+        return jsonify({"status": "error", "message": "Missing `file` parameter"}), 400
+
     payload = file.read()
     midi_type = request.form.get("midi_type")
     score_url = request.form.get("score")
     profile = request.form.get("profile")
     label = request.form.get("label")
+
+    if not profile:
+        return jsonify({"status": "error", "message": "Missing `profile` parameter"}), 400
 
     provider = lookup_provider_from_profile(profile)
     storage = get_storage_from_profile(profile)

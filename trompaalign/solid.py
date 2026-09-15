@@ -679,10 +679,10 @@ def lookup_provider_from_profile(profile_url: str):
         print(f"Cannot fetch or parse a profile at this url: {e}")
         return None
     issuer = rdflib.URIRef("http://www.w3.org/ns/solid/terms#oidcIssuer")
-    triples = list(graph.triples([None, issuer, None]))
+    triples = list(graph.triples((None, issuer, None)))
     if triples:
         # first item in the response, 3rd item in the triple
-        return triples[0][2].toPython()
+        return triples[0][2].toPython()  # ty: ignore[unresolved-attribute]
 
 
 def get_title_from_mei(payload, filename):
@@ -1078,7 +1078,8 @@ def get_uri_jsonld_or_none(uri, headers=None):
         return get_uri_jsonld(uri, headers)
     except requests.exceptions.HTTPError as e:
         print("Error", e)
-        print(" message:", e.response.text)
+        if e.response is not None:
+            print(" message:", e.response.text)
         return None, None
 
 
@@ -1111,7 +1112,7 @@ def get_storage_from_profile(profile_uri):
     if storage is None:
         print("No storage found")
         return None
-    return storage.toPython()
+    return storage.toPython()  # ty: ignore[unresolved-attribute]
 
 
 def save_performance_manifest(solid_client, provider, profile, performance_uri, manifest):

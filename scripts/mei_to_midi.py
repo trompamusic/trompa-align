@@ -12,7 +12,7 @@ verovio.enableLog(False)
 def mei_to_midi(mei, fname, expansion=None):
     vrv = verovio.toolkit()
     if bool(expansion):
-        vrv.setOption("expand", expansion)
+        vrv.setOptions({"expand": expansion})
     vrv.loadData(mei)
     vrv.renderToMIDIFile(fname)
 

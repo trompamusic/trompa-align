@@ -72,6 +72,7 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
     matched = {}
     for candidate in candidate_matches:
         mei_id = candidate["id"]
+        # ty: ignore[unsupported-operator]
         if mei_id not in matched or candidate["dist"] < matched[mei_id]["dist"]:
             matched[mei_id] = candidate
 
@@ -95,6 +96,7 @@ def generate_maps_result_json(corresp_string, attrs, output_file, threshold=5):
         maps_export.append(
             {
                 "obs_mean_onset": note["alignOntime"],
+                # ty: ignore[unresolved-attribute]
                 "xml_id": f"trompa-align_inserted_{note['alignSitch'].replace('#', 's')}",
                 "velocity": note["alignOnvel"],
             }

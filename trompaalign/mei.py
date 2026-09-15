@@ -1,6 +1,6 @@
 import hashlib
 from io import BytesIO
-from lxml import etree
+from lxml import etree  # ty: ignore[unresolved-import]
 from dataclasses import dataclass
 
 

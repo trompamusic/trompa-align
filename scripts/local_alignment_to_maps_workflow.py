@@ -8,9 +8,9 @@ import sys
 import tempfile
 from datetime import datetime
 
-from mei_to_midi import mei_to_midi
-from smat_align import smat_align
-from write_expanded_mei_data import write_expanded_mei_data
+from .mei_to_midi import mei_to_midi
+from .smat_align import smat_align
+from .write_expanded_mei_data import write_expanded_mei_data
 
 
 def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
@@ -77,7 +77,7 @@ def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
 
         except Exception as e:
             logging.error("!!!!! Could not process " + midi.name + " -- skipping")
-            logging.error("!!!!! Exception was: " + e)
+            logging.error("!!!!! Exception was: " + str(e))
             break
 
 

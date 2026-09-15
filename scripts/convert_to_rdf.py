@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from statistics import mean
 
-from lxml import etree as ET
+from lxml import etree as ET  # ty: ignore[unresolved-import]
 from rdflib import Graph, URIRef, RDF, SKOS, Literal, BNode
 from rdflib.namespace import DCTERMS, RDFS
 from pyld import jsonld
@@ -382,6 +382,8 @@ if __name__ == "__main__":
     if includePerformance and (scoreUri is None or audioUri is None):
         sys.exit("You must provide each of --scoreUri and --audioUri if includePerformance is requested")
     if solidContainer is not None:
+        if outputFName is None:
+            sys.exit("You must provide --timelineOutput when --solidContainer is specified")
         solidContainer = os.path.join(solidContainer, "")
         performancesUri = os.path.join(solidContainer, "performance", os.path.basename(outputFName))
         tlUri = os.path.join(solidContainer, os.path.basename(outputFName))
@@ -459,9 +461,9 @@ if __name__ == "__main__":
                         print("Performance timeline (turtle) written: " + outputFName + ".ttl")
                 if outputFormat == "json" or outputFormat == "jsonld" or outputFormat == "both":
                     extension = ".jsonld"
-                    jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
+                    jsonld_data = json.dumps(graph_to_jsonld(g, extension), indent=2)
                     with open(outputFName + extension, "w") as json_file:
-                        json_file.write(jsonld)
+                        json_file.write(jsonld_data)
                         print("Performance timeline (json-ld) written: " + outputFName + extension)
         else:
             print("File does not exist: ", fName)
@@ -472,14 +474,15 @@ if __name__ == "__main__":
                 "You must provide --segmentlineOutput, --segmentlineUri, and --meiUri when a MEI file is specified"
             )
         seg_data = generate_structural_segmentation(meiFile)
-        g = segmentation_to_graph(seg_data, segUri, meiUri)
+        g = segmentation_to_graph(seg_data, segUri)
         if outputFormat == "ttl" or outputFormat == "both":
             ttl = graph_to_turtle(g)
             with open(segmentlineOutput + ".ttl", "w") as ttl_file:
-                ttl_file.write(ttl)
+                ttl_file.write(ttl.decode("utf-8"))
                 print("MEI score segmentation (ttl) written: " + segmentlineOutput + ".ttl")
         if outputFormat == "json" or outputFormat == "jsonld" or outputFormat == "both":
-            jsonld = json.dumps(graph_to_jsonld(g, extension), indent=2)
+            extension = ".jsonld"
+            jsonld_data = json.dumps(graph_to_jsonld(g, extension), indent=2)
             with open(segmentlineOutput + extension, "w") as json_file:
-                json_file.write(jsonld)
+                json_file.write(jsonld_data)
                 print("MEI score segmentation (json-ld) written: " + segmentlineOutput + extension)

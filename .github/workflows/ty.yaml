@@ -1,0 +1,15 @@
+name: ty type check
+on:
+  pull_request:
+    branches: [ '*' ]
+    types: [ push, opened, synchronize, reopened, ready_for_review ]
+jobs:
+  ty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --group dev
+      - run: uv run ty check

@@ -2,7 +2,6 @@ import argparse
 from solidauth import httpclient
 import sys
 
-import json
 import verovio
 
 verovio.enableLog(False)
@@ -11,7 +10,7 @@ verovio.enableLog(False)
 def write_expanded_mei_data(mei, fname, expansion):
     vrv = verovio.toolkit()
     if bool(expansion):
-        vrv.setOptions(json.dumps({"expand": expansion}))
+        vrv.setOptions({"expand": expansion})
     vrv.loadData(mei)
     print("writing mei to: ", fname)
     vrv.saveFile(fname)

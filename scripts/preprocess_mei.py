@@ -8,7 +8,7 @@ from .mei_to_midi import mei_to_midi
 def main(mei_file, mei_uri, structure_uri, structure_out, midi_out):
     # generate structure RDF (jsonld)
     structure_data = generate_structural_segmentation(mei_file)
-    g = segmentation_to_graph(structure_data, structure_uri, mei_uri)
+    g = segmentation_to_graph(structure_data, structure_uri)
     jsonld = json.dumps(graph_to_jsonld(g, ""), indent=2)
     with open(structure_out, "w") as json_file:
         json_file.write(jsonld)

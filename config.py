@@ -2,12 +2,25 @@ import os
 
 from celery.schedules import crontab
 
+
+def require_env(name: str) -> str:
+    """Read an environment variable that the app cannot start without.
+
+    Raises with the variable's name rather than letting an unset value fail
+    later as a confusing TypeError when it's joined onto a URL.
+    """
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Required environment variable {name} is not set")
+    return value
+
+
 REDIS_URL = os.getenv("TR_ALIGN_REDIS_URL")
 
 SECRET_KEY = os.getenv("TR_ALIGN_SECRET_KEY")
 SQLALCHEMY_DATABASE_URI = os.getenv("TR_ALIGN_SQLALCHEMY_DATABASE_URI")
 
-BASE_URL = os.getenv("TR_ALIGN_BASE_URL")
+BASE_URL = require_env("TR_ALIGN_BASE_URL")
 REDIRECT_URL_BACKEND = os.path.join(BASE_URL, "api/auth/callback-backend")
 REDIRECT_URLS = [BASE_URL, REDIRECT_URL_BACKEND]
 

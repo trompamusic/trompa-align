@@ -130,7 +130,7 @@ def add_score(profile, mei_external_uri):
         get_pod_listing(cl, provider, profile, storage)
     except urllib.error.HTTPError as e:
         if e.status == 404:
-            create_clara_container(provider, profile, storage)
+            create_clara_container(cl, provider, profile, storage)
 
     # Early exit if the score already exists in mapping
     try:
@@ -256,6 +256,7 @@ def align_recording(profile, score_url, webmidi_url, midi_url, label):
                 label,
             )
 
+            # ty: ignore[no-matching-overload]
             performance_resource = os.path.join(performance_container, perf_fname)
             logger.info(f"Performance resource: {performance_resource}")
             timeline_resource = os.path.join(timeline_container, perf_fname)
