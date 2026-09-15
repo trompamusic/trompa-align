@@ -3,11 +3,12 @@ FROM nikolaik/python-nodejs:python3.13-nodejs24 AS base
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=1 \
   UV_PYTHON_DOWNLOADS=never \
-  UV_NO_SYNC=1
+  UV_NO_SYNC=1 \
+  UV_PROJECT_ENVIRONMENT=/opt/venv
 
 ENV PYTHONUNBUFFERED=1
 
-COPY --from=ghcr.io/astral-sh/uv:0.9.15 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /uvx /bin/
 
 #install dependencies needed for R-builder, but install the remaining dependencies in the trompa-align stage
 RUN apt-get update \
@@ -44,7 +45,7 @@ RUN unzip /smat/smat.zip -d /smat \
 COPY pyproject.toml uv.lock /code/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --group prod
 
-ENV PATH="/code/.venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH"
 
 COPY --from=r-builder /usr/local/lib/R /usr/local/lib/R
 COPY . /code
