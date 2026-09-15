@@ -10,6 +10,7 @@ from urllib.parse import unquote, urlsplit
 import uuid
 
 import rdflib
+import rdflib.exceptions
 from rdflib.namespace import RDF, SDO, SKOS
 from rdflib.term import Literal
 import requests
@@ -28,6 +29,17 @@ logger = logging.getLogger(__name__)
 
 class SolidError(Exception):
     pass
+
+
+def require_value(graph: rdflib.Graph, uri: str, subject=None, predicate=None, object_=None) -> str:
+    """Return the single term matching the given pattern, raising if it's missing or ambiguous."""
+    try:
+        value = graph.value(subject=subject, predicate=predicate, object=object_, any=False)
+    except rdflib.exceptions.UniquenessError:
+        raise ValueError(f"URI {uri} has more than one {predicate}") from None
+    if value is None:
+        raise ValueError(f"URI {uri} is missing {predicate}")
+    return str(value)
 
 
 jsonld_context = {
@@ -787,11 +799,6 @@ def load_score_from_uri(solid_client, provider, profile, storage, uri: str) -> S
     graph = rdflib.Graph()
     uri_ref = URIRef(uri)
 
-    external_uri = None
-    mei_uri = None
-    performances_container = None
-    segments_uri = None
-
     graph.parse(data=ttl_bytes.decode("utf-8"), format="n3")
 
     # check the uri's type (i.e. skip old scores.ttl file)
@@ -799,29 +806,10 @@ def load_score_from_uri(solid_client, provider, profile, storage, uri: str) -> S
     if not triples:
         raise ValueError(f"URI {uri} is not a score")
 
-    for _s, _p, o in graph.triples((uri_ref, MO.published_as, None)):
-        if isinstance(o, rdflib.term.Node):
-            print("published_as", o)
-            external_uri = str(o)
-
-    for s, _p, _o in graph.triples((None, SKOS.exactMatch, URIRef(external_uri))):
-        if isinstance(s, rdflib.term.Node):
-            print("exactMatch", s)
-            mei_uri = str(s)
-
-    for s, _p, o in graph.triples((uri_ref, SKOS.related, None)):
-        if isinstance(o, rdflib.term.Node):
-            print("related", o)
-            performances_container = str(o)
-
-    for s, _p, o in graph.triples((uri_ref, MELD.segments, None)):
-        if isinstance(o, rdflib.term.Node):
-            print("segments", o)
-            segments_uri = str(o)
-
-    if external_uri is None or mei_uri is None or performances_container is None or segments_uri is None:
-        print(f"{uri=}, {external_uri=}, {mei_uri=}, {performances_container=}, {segments_uri=}")
-        raise ValueError(f"URI {uri} unexpectedly missing data")
+    external_uri = require_value(graph, uri, subject=uri_ref, predicate=MO.published_as)
+    mei_uri = require_value(graph, uri, predicate=SKOS.exactMatch, object_=URIRef(external_uri))
+    performances_container = require_value(graph, uri, subject=uri_ref, predicate=SKOS.related)
+    segments_uri = require_value(graph, uri, subject=uri_ref, predicate=MELD.segments)
 
     return Score(
         uri=uri,
@@ -872,52 +860,25 @@ def load_performance_from_uri(solid_client, provider, profile, uri: str) -> Perf
     graph = rdflib.Graph()
     uri_ref = URIRef(uri)
     graph.parse(data=ttl_bytes.decode("utf-8"), format="n3")
-    performance_of = None
-    signal_uri = None
-    available_as = None
-    derived_from = None
-    timeline = None
-    offset = None
-
     triples = list(graph.triples((uri_ref, RDF.type, MO.Performance)))
     if not triples:
         raise ValueError(f"URI {uri} is not a performance")
 
-    for _s, _p, o in graph.triples((uri_ref, MO.performance_of, None)):
-        if isinstance(o, rdflib.term.Node):
-            performance_of = str(o)
-            print("performance_of", o)
+    performance_of = require_value(graph, uri, subject=uri_ref, predicate=MO.performance_of)
+    signal_uri = require_value(graph, uri, subject=uri_ref, predicate=MO.recorded_as)
+    offset = graph.value(subject=uri_ref, predicate=MELD.offset)
+    offset = None if offset is None else str(offset)
 
-    for _s, _p, o in graph.triples((uri_ref, MO.recorded_as, None)):
-        if isinstance(o, rdflib.term.Node):
-            signal_uri = str(o)
-            print("recorded_as", o)
-
-    for _s, _p, o in graph.triples((uri_ref, MELD.offset, None)):
-        offset = str(o)
-        print("offset", o)
-        break
-
-    if signal_uri:
-        signal_ref = URIRef(signal_uri)
-        for _s, _p, o in graph.triples((signal_ref, MO.available_as, None)):
-            if isinstance(o, rdflib.term.Node):
-                available_as = str(o)
-                print("available_as", o)
-        for _s, _p, o in graph.triples((signal_ref, MO.derived_from, None)):
-            if isinstance(o, rdflib.term.Node):
-                derived_from = str(o)
-                print("derived_from", o)
-        for _s, _p, o in graph.triples((signal_ref, MO.time, None)):
-            if isinstance(o, rdflib.term.Node):
-                for _ss, _pp, oo in graph.triples((o, TL.onTimeLine, None)):
-                    if isinstance(oo, rdflib.term.Node):
-                        timeline = str(oo)
-                        print("timeline", oo)
-
-    if None in (performance_of, signal_uri, available_as, derived_from, timeline):
-        print(f"{uri=}, {performance_of=}, {signal_uri=}, {available_as=}, {derived_from=}, {timeline=}, {offset=}")
-        raise ValueError(f"URI {uri} unexpectedly missing data")
+    signal_ref = URIRef(signal_uri)
+    available_as = require_value(graph, uri, subject=signal_ref, predicate=MO.available_as)
+    derived_from = require_value(graph, uri, subject=signal_ref, predicate=MO.derived_from)
+    try:
+        interval = graph.value(subject=signal_ref, predicate=MO.time, any=False)
+    except rdflib.exceptions.UniquenessError:
+        raise ValueError(f"URI {uri} has more than one {MO.time}") from None
+    if interval is None:
+        raise ValueError(f"URI {uri} is missing {MO.time}")
+    timeline = require_value(graph, uri, subject=interval, predicate=TL.onTimeLine)
 
     return Performance(
         uri=uri,
