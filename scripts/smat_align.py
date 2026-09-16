@@ -16,6 +16,14 @@ class SmatException(Exception):
         self.stage = stage
 
 
+def _run_smat_tool(args: list[str], cwd: str) -> None:
+    """Run one SMAT tool, converting a non-zero exit status into a SmatException."""
+    try:
+        subprocess.run(args, cwd=cwd, check=True)
+    except subprocess.CalledProcessError as e:
+        raise SmatException(args[0], f"{args[0]} exited with status {e.returncode}") from e
+
+
 def smat_align(file1, file2):
     # Align 2 midi files. This is a python port of MIDIToMIDIAlign.sh from SMAT
     # It assumes that the compiled tools are in $PATH
@@ -28,23 +36,23 @@ def smat_align(file1, file2):
 
         # Generate pianoroll. Assumes that files are in tempdir. Argument doesn't include
         # extension. Output filename is {stem}_spr.txt
-        subprocess.run(["midi2pianoroll", "0", file1_stem], cwd=tempdir)
-        subprocess.run(["midi2pianoroll", "0", file2_stem], cwd=tempdir)
+        _run_smat_tool(["midi2pianoroll", "0", file1_stem], cwd=tempdir)
+        _run_smat_tool(["midi2pianoroll", "0", file2_stem], cwd=tempdir)
 
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_spr.txt")):
             raise SmatException("midi2pianoroll", f"spr of first file, {file1_stem}_spr.txt, doesn't exist")
         if not os.path.exists(os.path.join(tempdir, f"{file2_stem}_spr.txt")):
             raise SmatException("midi2pianoroll", f"spr of second file, {file2_stem}_spr.txt, doesn't exist")
 
-        subprocess.run(["SprToFmt3x", f"{file1_stem}_spr.txt", f"{file1_stem}_fmt3x.txt"], cwd=tempdir)
+        _run_smat_tool(["SprToFmt3x", f"{file1_stem}_spr.txt", f"{file1_stem}_fmt3x.txt"], cwd=tempdir)
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_fmt3x.txt")):
             raise SmatException("SprToFmt3x", f"fmt3x of first file, {file1_stem}_fmt3x.txt, doesn't exist")
 
-        subprocess.run(["Fmt3xToHmm", f"{file1_stem}_fmt3x.txt", f"{file1_stem}_hmm.txt"], cwd=tempdir)
+        _run_smat_tool(["Fmt3xToHmm", f"{file1_stem}_fmt3x.txt", f"{file1_stem}_hmm.txt"], cwd=tempdir)
         if not os.path.exists(os.path.join(tempdir, f"{file1_stem}_hmm.txt")):
             raise SmatException("Fmt3xToHmm", f"hmm of first file, {file1_stem}_hmm.txt, doesn't exist")
 
-        subprocess.run(
+        _run_smat_tool(
             [
                 "ScorePerfmMatcher",
                 f"{file1_stem}_hmm.txt",
@@ -59,7 +67,7 @@ def smat_align(file1, file2):
                 "ScorePerfmMatcher", f"pre_match of second file, {file2_stem}_pre_match.txt, doesn't exist"
             )
 
-        subprocess.run(
+        _run_smat_tool(
             [
                 "ErrorDetection",
                 f"{file1_stem}_fmt3x.txt",
@@ -75,7 +83,7 @@ def smat_align(file1, file2):
                 "ErrorDetection", f"err_match of second file, {file2_stem}_err_match.txt, doesn't exist"
             )
 
-        subprocess.run(
+        _run_smat_tool(
             [
                 "RealignmentMOHMM",
                 f"{file1_stem}_fmt3x.txt",
@@ -91,7 +99,7 @@ def smat_align(file1, file2):
                 "RealignmentMOHMM", f"realigned_match of second file, {file2_stem}_realigned_match.txt, doesn't exist"
             )
 
-        subprocess.run(
+        _run_smat_tool(
             [
                 "MatchToCorresp",
                 f"{file2_stem}_realigned_match.txt",
@@ -132,7 +140,7 @@ if __name__ == "__main__":
     try:
         shutil.copy(args.canonicalMIDI, smatPath + tmpUuid + "canonical.mid")
         shutil.copy(args.performanceMIDI, smatPath + tmpUuid + "performance.mid")
-    except IOError as e:
+    except OSError as e:
         sys.exit("Unable to copy MIDI files to SMAT directory. Please ensure SMAT directory is writeable. %s" % e)
     except Exception:
         sys.exit(f"Unexpected error: {sys.exc_info()}")
@@ -144,7 +152,7 @@ if __name__ == "__main__":
     os.chdir(mainDir)
     try:
         shutil.copy(smatPath + tmpUuid + "performance_corresp.txt", args.out)
-    except IOError as e:
+    except OSError as e:
         sys.exit("Unable to copy corresp file to output path. Did corresp get generated? %s" % e)
     except Exception:
         sys.exit(f"Unexpected error copying corresp file: {sys.exc_info()}")

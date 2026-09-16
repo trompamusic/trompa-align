@@ -114,7 +114,8 @@ def perform_workflow(
             os.path.join(tempdir, "corresp.txt"),
             r_output,
             verovio_json_notes,
-        ]
+        ],
+        check=True,
     )
 
     # Run Python version

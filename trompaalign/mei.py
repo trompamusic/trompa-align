@@ -1,7 +1,8 @@
 import hashlib
-from io import BytesIO
-from lxml import etree  # ty: ignore[unresolved-import]
 from dataclasses import dataclass
+from io import BytesIO
+
+from lxml import etree  # ty: ignore[unresolved-import]
 
 
 @dataclass
@@ -121,7 +122,7 @@ def count_notes_in_expansions(mei_text):
 
     expansion_counts = {}
 
-    for expansion_id, expansion in expansion_map.items():
+    for expansion_id in expansion_map:
         # Get all section IDs for the given expansion
         section_ids = resolve_expansion_elements(expansion_map, expansion_id)
 
@@ -129,7 +130,7 @@ def count_notes_in_expansions(mei_text):
         total_notes = 0
         for section_id in section_ids:
             # Remove the # prefix
-            actual_id = section_id[1:] if section_id.startswith("#") else section_id
+            actual_id = section_id.removeprefix("#")
 
             # Find the element with this ID and count notes in it
             xpath = f"//*[@xml:id='{actual_id}']//mei:note"

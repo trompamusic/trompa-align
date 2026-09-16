@@ -6,19 +6,19 @@ import urllib.error
 import uuid
 from dataclasses import dataclass
 
-from flask import current_app
 import rdflib
 import requests
 from celery import shared_task
+from flask import current_app
 from rdflib import RDF, SKOS, URIRef
+from solidauth import client, httpclient
+from solidauth.solid import ProviderConfigurationError
 
 from scripts.convert_to_rdf import graph_to_jsonld, graph_to_turtle
 from scripts.midi_events_to_file import midi_json_to_midi
 from scripts.namespace import MO
 from scripts.performance_alignment_workflow import perform_workflow
 from scripts.smat_align import SmatException
-from solidauth import client, httpclient
-from solidauth.solid import ProviderConfigurationError
 from trompaalign import celery_serializers  # noqa: F401
 from trompaalign.extensions import backend
 from trompaalign.mei import mei_is_valid
@@ -27,7 +27,6 @@ from trompaalign.solid import (
     SolidError,
     create_and_save_structure,
     create_clara_container,
-    score_exists_in_list,
     get_pod_listing,
     get_resource_from_pod,
     get_storage_from_profile,
@@ -35,11 +34,11 @@ from trompaalign.solid import (
     lookup_provider_from_profile,
     save_performance_manifest,
     save_performance_timeline,
+    score_exists_in_list,
     upload_mei_to_pod,
     upload_midi_to_pod,
     upload_mp3_to_pod,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +226,8 @@ def align_recording(profile, score_url, webmidi_url, midi_url, label):
             midi = midi_json_to_midi(json.loads(webmidi.decode("utf-8")))
             midi_file = os.path.join(td, "performance.mid")
             midi.save(midi_file)
-            midi_url = upload_midi_to_pod(cl, provider, profile, storage, open(midi_file, "rb").read())
+            with open(midi_file, "wb") as fp:
+                midi_url = upload_midi_to_pod(cl, provider, profile, storage, fp.read())
         else:
             logger.info("only got a midi URL, using it directly")
             midi_contents = get_resource_from_pod(cl, provider, profile, midi_url)
@@ -263,13 +263,14 @@ def align_recording(profile, score_url, webmidi_url, midi_url, label):
             logger.info(f"Timeline resource: {timeline_resource}")
 
             audio_resource = os.path.join(audio_container, audio_fname)
-            mp3_uri = upload_mp3_to_pod(
-                cl,
-                provider,
-                profile,
-                audio_resource,
-                open(os.path.join(td, audio_fname), "rb").read(),
-            )
+            with open(os.path.join(td, audio_fname), "rb") as fp:
+                mp3_uri = upload_mp3_to_pod(
+                    cl,
+                    provider,
+                    profile,
+                    audio_resource,
+                    fp.read(),
+                )
 
             # Add triples for Signal->Midi and Midi->webmidi
             performance_graph.add((URIRef(midi_url), RDF.type, MO.Signal))

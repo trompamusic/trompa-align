@@ -36,7 +36,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
-    "ruff>=0.12.5",
+    "ruff~=0.16.7",
     "ty>=0.0.81",
 ]
 prod = [
@@ -51,7 +51,18 @@ line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
-ignore = ["E741"]
+ignore = [
+    "E741",
+    "SIM102",
+    "UP030",
+    "UP031",
+    "UP032",
+    # ignored from upgrade to ruff 0.16
+    "BLE001",
+    "LOG015",
+    "S110",
+    "S112",
+]
 
 [tool.ty.src]
 include = ["trompaalign", "scripts", "app.py", "config.py"]

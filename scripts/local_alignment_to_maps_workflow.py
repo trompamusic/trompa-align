@@ -2,11 +2,12 @@ import argparse
 import logging
 import os
 import pathlib
-from solidauth import httpclient
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
+
+from solidauth import httpclient
 
 from .mei_to_midi import mei_to_midi
 from .smat_align import smat_align
@@ -25,7 +26,7 @@ def batch_process(midi_files, mei_uri, expansions, outdir, tempdir):
 
 def process(midi, mei_uri, expansions, outdir, tempdir, mei_data):
     logging.basicConfig(
-        filename="log-" + datetime.now().isoformat() + ".log",
+        filename="log-" + datetime.now(UTC).isoformat() + ".log",
         encoding="utf-8",
         level=logging.DEBUG,
         format="%(asctime)s %(message)s",

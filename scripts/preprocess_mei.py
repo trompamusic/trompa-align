@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from .convert_to_rdf import generate_structural_segmentation, segmentation_to_graph, graph_to_jsonld
+from .convert_to_rdf import generate_structural_segmentation, graph_to_jsonld, segmentation_to_graph
 from .mei_to_midi import mei_to_midi
 
 

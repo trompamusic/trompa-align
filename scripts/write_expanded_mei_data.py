@@ -1,8 +1,8 @@
 import argparse
-from solidauth import httpclient
 import sys
 
 import verovio
+from solidauth import httpclient
 
 verovio.enableLog(False)
 
@@ -28,9 +28,7 @@ if __name__ == "__main__":
     output = args.output
     if not bool(output):
         sys.exit("Please supply an --output file name for your MIDI file")
-    if bool(meiUri) and bool(meiFile):
-        sys.exit("Please specify EITHER --meiUri OR --meiFile")
-    elif not (bool(meiUri) or bool(meiFile)):
+    if bool(meiUri) and bool(meiFile) or not (bool(meiUri) or bool(meiFile)):
         sys.exit("Please specify EITHER --meiUri OR --meiFile")
     if bool(meiFile):
         with open(meiFile, "r") as f:

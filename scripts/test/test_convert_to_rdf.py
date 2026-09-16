@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Comprehensive test suite for score_to_graph function to ensure behavior is preserved
 during refactoring from mixed string/rdflib approach to pure rdflib approach.

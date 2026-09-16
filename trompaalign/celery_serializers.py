@@ -5,7 +5,6 @@ from typing import Any
 
 from kombu.serialization import register
 
-
 DATACLASS_MARKER = "__dataclass__"
 
 

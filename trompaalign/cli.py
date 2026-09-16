@@ -1,27 +1,28 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import click
 import requests
-from rdflib.namespace import RDF
-from trompaalign.extensions import db, backend
 from flask import current_app
 from flask.cli import AppGroup
+from rdflib.namespace import RDF
 from solidauth import client, httpclient
 from solidauth.migrations import upgrade
 
+from trompaalign import batch
+from trompaalign.extensions import backend, db
 from trompaalign.solid import (
     CLARA_CONTAINER_NAME,
     LDP,
     add_score_to_list,
     create_and_save_structure,
     create_clara_container,
+    delete_acl_for_resource,
     delete_duplicate_scores,
     delete_resource,
     find_score_for_external_uri,
-    list_external_score_urls,
     get_contents_of_container,
     get_pod_listing,
     get_pod_listing_ttl,
@@ -29,12 +30,12 @@ from trompaalign.solid import (
     get_storage_from_profile,
     get_title_from_mei,
     http_options,
+    list_external_score_urls,
     lookup_provider_from_profile,
-    patch_container_item_title,
     parse_pod_graph,
+    patch_container_item_title,
     recursive_delete_from_pod,
     save_resource_from_pod,
-    delete_acl_for_resource,
     set_resource_acl_private,
     set_resource_acl_public,
     update_score_list_bulk,
@@ -42,7 +43,6 @@ from trompaalign.solid import (
     upload_midi_to_pod,
     upload_webmidi_to_pod,
 )
-from trompaalign import batch
 from trompaalign.tasks import align_recording
 
 cli = AppGroup("solid", help="Solid commands")
@@ -286,7 +286,8 @@ def cmd_upload_score_to_pod(profile, url, file, title):
         return
     elif url and file:
         print("URL and File set, loading file from disk and using url as source")
-        payload = open(file).read()
+        with open(file) as fp:
+            payload = fp.read()
         filename = os.path.basename(file)
     else:
         print(f"Downloading file from {url}")
@@ -316,7 +317,8 @@ def cmd_upload_webmidi_to_pod(profile, file):
         print("Cannot find storage, quitting")
         return
 
-    payload = open(file, "rb").read()
+    with open(file, "rb") as fp:
+        payload = fp.read()
 
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     resource = upload_webmidi_to_pod(cl, provider, profile, storage, payload)
@@ -337,7 +339,8 @@ def cmd_upload_midi_to_pod(profile, file):
         print("Cannot find storage, quitting")
         return
 
-    payload = open(file, "rb").read()
+    with open(file, "rb") as fp:
+        payload = fp.read()
 
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     resource = upload_midi_to_pod(cl, provider, profile, storage, payload)
@@ -359,7 +362,8 @@ def add_turtle(profile, resource, file):
         print("Cannot find storage, quitting")
         return
 
-    payload = open(file, "rb").read()
+    with open(file, "rb") as fp:
+        payload = fp.read()
     print(f"Uploading file {resource}")
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
@@ -383,7 +387,8 @@ def add_jsonld(profile, resource, file):
         print("Cannot find storage, quitting")
         return
 
-    payload = open(file, "rb").read()
+    with open(file, "rb") as fp:
+        payload = fp.read()
     print(f"Uploading file {resource}")
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
     headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
@@ -468,12 +473,11 @@ def cmd_align_recording(is_midi, profile, score_url, midi_url):
         return
 
     if is_midi:
-        midi_url = midi_url
         webmidi_url = None
     else:
-        midi_url = None
         webmidi_url = midi_url
-    label = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        midi_url = None
+    label = datetime.now(UTC).isoformat(timespec="seconds")
     align_recording(profile, score_url, webmidi_url, midi_url, label)
 
 

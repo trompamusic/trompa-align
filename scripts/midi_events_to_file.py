@@ -1,9 +1,7 @@
-#!/usr/bin/python
-
 import argparse
 import json
 
-from mido import Message, MidiFile, MidiTrack, second2tick, bpm2tempo
+from mido import Message, MidiFile, MidiTrack, bpm2tempo, second2tick
 
 ticks_per_beat = 5000
 tempo = bpm2tempo(120)

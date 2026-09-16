@@ -1,5 +1,5 @@
 from trompaalign import cli, cli_api
-from trompaalign.webserver import webserver_bp, create_app
+from trompaalign.webserver import create_app, webserver_bp
 
 app = create_app()
 

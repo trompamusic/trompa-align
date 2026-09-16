@@ -1,5 +1,6 @@
 from pathlib import Path
-from trompaalign.mei import count_notes_in_expansions, get_expansions_from_mei, Expansion
+
+from trompaalign.mei import Expansion, count_notes_in_expansions, get_expansions_from_mei
 
 test_dir = Path(__file__).parent / "data"
 

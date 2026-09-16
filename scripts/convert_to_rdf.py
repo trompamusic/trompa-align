@@ -3,15 +3,15 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from statistics import mean
 
 from lxml import etree as ET  # ty: ignore[unresolved-import]
-from rdflib import Graph, URIRef, RDF, SKOS, Literal, BNode
-from rdflib.namespace import DCTERMS, RDFS
 from pyld import jsonld
+from rdflib import RDF, SKOS, BNode, Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS, RDFS
 
-from scripts.namespace import MO, MELD, TL
+from scripts.namespace import MELD, MO, TL
 
 
 def maps_result_to_graph(maps_result_json, meiUri, tlUri, scoreUri, audioUri, includePerformance, label):
@@ -94,10 +94,10 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
             with open(mapsResultFile, "rb") as f:
                 try:
                     maps_result_json = f.read()
-                except IOError:
+                except OSError:
                     print("Warning: Skipping file (could not read): ", fName)
                     continue
-            label = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            label = datetime.now(UTC).isoformat(timespec="seconds")
             graphs.append(
                 {
                     # generate performance RDF
@@ -120,7 +120,7 @@ def performances_to_graphs(performances_tsv, segUri, meiUri, tlUri, recordingUri
 
 
 def performance_to_graph(performance_uri, timeline_uri, score_uri, audio_uri, label):
-    created = datetime.now(timezone.utc).isoformat()
+    created = datetime.now(UTC).isoformat()
     graph = Graph()
     performance_uri_ref = URIRef(performance_uri)
     score_uri_ref = URIRef(score_uri)
@@ -204,16 +204,12 @@ def generate_structural_segmentation(meiFile):
         if obj["section"][0] not in last_note_per_section:
             last_note_per_section[obj["section"][0]] = {"last": obj["noteId"], "order": i}
             i += 1
-    for n in first_note_per_section:
-        first_note_per_section[n]["last"] = last_note_per_section[n]["last"]
+    for n, section in first_note_per_section.items():
+        section["last"] = last_note_per_section[n]["last"]
         # identify the note IDs for all objects in section n
-        first_note_per_section[n]["notes"] = set(
-            list(map(lambda x: x["noteId"], filter(lambda y: n in y["section"], seg_data)))
-        )
+        section["notes"] = {x["noteId"] for x in seg_data if n in x["section"]}
         # identify the measures for all objects in section n
-        first_note_per_section[n]["measures"] = set(
-            list(map(lambda x: x["measure"][0], filter(lambda y: n in y["section"], seg_data)))
-        )
+        section["measures"] = {x["measure"][0] for x in seg_data if n in x["section"]}
     return first_note_per_section
 
 
@@ -441,10 +437,10 @@ if __name__ == "__main__":
             with open(fName, "rb") as f:
                 try:
                     maps_result_json = f.read()
-                except IOError:
+                except OSError:
                     print("Could not read file: ", fName)
                     sys.exit()
-                label = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                label = datetime.now(UTC).isoformat(timespec="seconds")
                 g = maps_result_to_graph(
                     maps_result_json,
                     meiUri,

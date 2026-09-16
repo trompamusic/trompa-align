@@ -1,10 +1,11 @@
-import os
 import logging
+import os
 from dataclasses import asdict, is_dataclass
 from logging.config import dictConfig
 
 import flask
 import sentry_sdk
+import solidauth.solid
 from celery import Celery, Task
 from celery.result import AsyncResult
 from flask import current_app, jsonify, redirect, request, url_for
@@ -12,10 +13,12 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client, httpclient
 from solidauth.solid import ProviderConfigurationError
-import solidauth.solid
 
-from trompaalign import celery_serializers  # noqa: F401
-from trompaalign import extensions, tasks
+from trompaalign import (
+    celery_serializers,  # noqa: F401
+    extensions,
+    tasks,
+)
 from trompaalign.solid import (
     SolidError,
     get_storage_from_profile,
@@ -23,7 +26,6 @@ from trompaalign.solid import (
     upload_midi_to_pod,
     upload_webmidi_to_pod,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -135,8 +137,7 @@ def clara_backend_jsonld(suffix=""):
     # It's normally recommended that this is a static file, but for simplicity serve it from flask
 
     baseurl = current_app.config["BASE_URL"]
-    if baseurl.endswith("/"):
-        baseurl = baseurl[:-1]
+    baseurl = baseurl.removesuffix("/")
 
     client_information = {
         "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],

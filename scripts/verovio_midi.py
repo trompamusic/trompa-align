@@ -22,18 +22,10 @@ def generate_notes_from_mei(mei_file, expansion):
     allNotes = []
     timemapNoteOns = list(filter(lambda x: "on" in x, timemap))
 
-    list(
-        map(
-            lambda x: list(
-                map(
-                    lambda y: allNotes.append(
-                        {"id": y, "tstamp": x["tstamp"], "midiPitch": tk.getMIDIValuesForElement(y)["pitch"]}
-                    ),
-                    x["on"],
-                )
-            ),
-            timemapNoteOns,
-        )
-    )
+    for noteOn in timemapNoteOns:
+        for noteId in noteOn["on"]:
+            allNotes.append(
+                {"id": noteId, "tstamp": noteOn["tstamp"], "midiPitch": tk.getMIDIValuesForElement(noteId)["pitch"]}
+            )
 
     return allNotes

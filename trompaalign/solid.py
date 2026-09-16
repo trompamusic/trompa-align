@@ -1,22 +1,22 @@
-from collections import Counter
-from dataclasses import dataclass
 import io
 import json
 import logging
 import mimetypes
 import os
+import uuid
+from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-import uuid
 
 import rdflib
 import rdflib.exceptions
-from rdflib.namespace import RDF, SDO, SKOS
-from rdflib.term import Literal
 import requests
 import requests.utils
 from pyld import jsonld
 from rdflib import URIRef
+from rdflib.namespace import RDF, SDO, SKOS
+from rdflib.term import Literal
 from solidauth import client, httpclient
 from solidauth.solid import RdfFetchError, fetch_graph
 
@@ -174,7 +174,6 @@ def discover_acl_uri(solid_client, provider, profile, resource_uri):
                 return acl_from_head
     except Exception:
         logger.debug("HEAD attempt failed for %s", resource_uri)
-        pass
 
     # Try OPTIONS
     try:
@@ -185,7 +184,6 @@ def discover_acl_uri(solid_client, provider, profile, resource_uri):
             return acl_from_options
     except Exception:
         logger.debug("OPTIONS attempt failed for %s", resource_uri)
-        pass
 
     # Fallback heuristic: append .acl
     if resource_uri.endswith("/"):
@@ -898,7 +896,7 @@ def update_score_list_bulk(solid_client, provider, profile, storage, external_ur
     """
     graph, _etag_ignored, score_data_resource = _get_score_list(solid_client, provider, profile, storage)
 
-    existing_urls = set(str(o) for _s, _p, o in graph.triples((None, SDO.itemListElement, None)))
+    existing_urls = {str(o) for _s, _p, o in graph.triples((None, SDO.itemListElement, None))}
     to_add = [u for u in sorted(external_urls) if u not in existing_urls]
 
     if not to_add:
@@ -960,7 +958,7 @@ def _get_score_list(solid_client, provider, profile, storage):
         if e.response is not None and e.response.status_code == 404:
             return _get_empty_score_list_graph(score_data_resource), None, score_data_resource
         else:
-            raise e
+            raise
 
 
 def _add_score_to_list(score_list_graph: rdflib.Graph, item_list_subject_uri: str, mei_external_uri: str):
@@ -1041,8 +1039,7 @@ def create_and_save_structure(
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
         print(f"Error making score: {e}")
-        print(r.text)
-        raise e
+        raise
     finally:
         print(r.text)
     print(r.text)
@@ -1055,8 +1052,7 @@ def create_and_save_structure(
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
         print(f"Error making segment: {e}")
-        print(r.text)
-        raise e
+        raise
     finally:
         print(r.text)
     print(r.text)
