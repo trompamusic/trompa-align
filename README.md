@@ -396,3 +396,21 @@ No title set, trying to get one from the MEI
 Creating https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/99666e85-b53b-4c2d-8523-afdfefadc6ff/
 Created
 Uploading file https://alastair.trompa-solid.upf.edu/at.ac.mdw.trompa/99666e85-b53b-4c2d-8523-afdfefadc6ff/Beethoven_WoO70-Breitkopf.mei
+## Solid HTTP rate limiting
+
+The backend limits HTTP request starts per process. `TR_ALIGN_RATE_LIMIT_DEFAULT`
+defaults to `40/10` (40 requests per 10 seconds). `TR_ALIGN_RATE_LIMITS` accepts
+comma-separated `host-suffix=limit/period` overrides, for example
+`solidcommunity.net=40/10,example.org=20/10`. A suffix shares one window across all
+matching pods; the longest matching suffix wins. Settings are validated at startup
+and apply to web, Celery, and Flask CLI processes.
+
+HTTP 429 responses retry up to three times with fresh DPoP proofs. Retry-After is
+respected up to the 60-second pause cap; larger delays end the current retry and
+pause later requests for 60 seconds. Exhausted refresh 429s retain stored tokens;
+permission checks return 503 with Retry-After. File uploads already materialize
+payloads before sending; retries do not support streaming files or generators.
+
+Each process has its own budget, so multiple workers can still exceed a provider's
+aggregate limit. Redirect hops and public remote JSON-LD context fetches remain
+outside limiter coverage. Token POST replay on 429 is an accepted provider assumption.

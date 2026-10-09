@@ -84,8 +84,6 @@ def create_ldp_container(
     if not container_uri.endswith("/"):
         container_uri = container_uri + "/"
 
-    headers = solid_client.get_bearer_for_user(provider, profile, container_uri, "PUT")
-
     graph = rdflib.Graph()
     container_ref = rdflib.URIRef(container_uri)
     LDP = rdflib.Namespace("http://www.w3.org/ns/ldp#")
@@ -95,13 +93,14 @@ def create_ldp_container(
 
     turtle_data = graph.serialize(format="turtle")
     type_headers = {"Accept": "text/turtle", "content-type": "text/turtle"}
-    headers.update(type_headers)
 
     request_kwargs = {}
     if timeout is not None:
         request_kwargs["timeout"] = timeout
 
-    r = httpclient.put(container_uri, data=turtle_data.encode("utf-8"), headers=headers, **request_kwargs)
+    r = solid_client.put(
+        provider, profile, container_uri, data=turtle_data.encode("utf-8"), headers=type_headers, **request_kwargs
+    )
     if r.status_code == 201:
         return container_uri
     try:
@@ -117,8 +116,7 @@ def create_ldp_container(
 
 
 def http_options(solid_client, provider, profile, container):
-    headers = solid_client.get_bearer_for_user(provider, profile, container, "OPTIONS")
-    r = httpclient.options(container, headers=headers)
+    r = solid_client.options(provider, profile, container)
     r.raise_for_status()
     return r.headers, r.content
 
@@ -163,9 +161,7 @@ def discover_acl_uri(solid_client, provider, profile, resource_uri):
     logger.debug("Discovering ACL URI for resource: %s", resource_uri)
     # Try HEAD first
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "HEAD")
-        logger.debug("HEAD %s with headers: %s", resource_uri, headers)
-        r = httpclient.head(resource_uri, headers=headers)
+        r = solid_client.head(provider, profile, resource_uri)
         # Some servers may not allow HEAD; ignore failures and try OPTIONS
         logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
         if r.ok:
@@ -198,9 +194,7 @@ def discover_acl_uri(solid_client, provider, profile, resource_uri):
 def _head_for_etag(solid_client, provider, profile, uri):
     """Return (exists: bool, etag: Optional[str])."""
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
-        logger.debug("Probing ETag via HEAD %s with headers: %s", uri, headers)
-        r = httpclient.head(uri, headers=headers)
+        r = solid_client.head(provider, profile, uri)
         logger.debug("HEAD status: %s, headers: %s", r.status_code, r.headers)
         if r.status_code == 404:
             logger.debug("HEAD indicates ACL does not exist: %s", uri)
@@ -212,10 +206,7 @@ def _head_for_etag(solid_client, provider, profile, uri):
     except Exception:
         # As a fallback, try GET to infer existence and ETag
         try:
-            headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
-            headers.update({"Accept": "text/turtle"})
-            logger.debug("Probing ETag via GET %s with headers: %s", uri, headers)
-            r = httpclient.get(uri, headers=headers)
+            r = solid_client.get(provider, profile, uri, headers={"Accept": "text/turtle"})
             logger.debug("GET status: %s, headers: %s", r.status_code, r.headers)
             if r.status_code == 404:
                 return False, None
@@ -236,8 +227,9 @@ def is_container_resource(solid_client, provider, profile, resource_uri: str) ->
     if the resource cannot be loaded as JSON-LD.
     """
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "GET")
-        data, _ = get_uri_jsonld_or_none(resource_uri, headers)
+        response = solid_client.get(provider, profile, resource_uri, headers={"Accept": "application/ld+json"})
+        response.raise_for_status()
+        data = response.json()
         if data is None:
             logger.debug("is_container_resource: JSON-LD unavailable, fallback heuristic for %s", resource_uri)
             return resource_uri.endswith("/")
@@ -324,15 +316,14 @@ def _put_document_with_preconditions(
     - If existing False: send If-None-Match: *
     - Sets Content-Type as provided; allows optional extra headers
     """
-    headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "PUT")
-    headers["content-type"] = content_type
+    headers = {"content-type": content_type}
     if extra_headers:
         headers.update(extra_headers)
     if existing and etag:
         headers["If-Match"] = etag
     if not existing:
         headers["If-None-Match"] = "*"
-    r = httpclient.put(resource_uri, data=content_bytes, headers=headers)
+    r = solid_client.put(provider, profile, resource_uri, data=content_bytes, headers=headers)
     if r.status_code == 412:
         raise SolidError("Update failed due to precondition (ETag mismatch). Reload and retry.")
     r.raise_for_status()
@@ -375,8 +366,7 @@ def delete_resource(solid_client, provider, profile, resource_uri: str):
     Raises:
         requests.HTTPError: If the deletion fails
     """
-    headers = solid_client.get_bearer_for_user(provider, profile, resource_uri, "DELETE")
-    r = httpclient.delete(resource_uri, headers=headers)
+    r = solid_client.delete(provider, profile, resource_uri)
     r.raise_for_status()
     return r
 
@@ -388,10 +378,10 @@ def delete_acl_for_resource(solid_client, provider, profile, resource_uri: str):
     if not exists:
         logger.debug("ACL does not exist for %s (uri=%s)", resource_uri, acl_uri)
         return acl_uri
-    headers = solid_client.get_bearer_for_user(provider, profile, acl_uri, "DELETE")
+    headers = {}
     if etag:
         headers["If-Match"] = etag
-    r = httpclient.delete(acl_uri, headers=headers)
+    r = solid_client.delete(provider, profile, acl_uri, headers=headers)
     if r.status_code == 412:
         raise SolidError("ACL delete failed due to precondition (ETag mismatch). Reload and retry.")
     r.raise_for_status()
@@ -414,16 +404,14 @@ def patch_container_item_title(solid_client, provider, profile, container, item,
     data related to the container other than the filesystem data (date created, etc)
     """
 
-    headers = solid_client.get_bearer_for_user(provider, profile, container, "PATCH")
     type_headers = {"Accept": "text/turtle", "content-type": "application/sparql-update"}
-    headers.update(type_headers)
 
     update_data = f"""INSERT DATA
 {{
   <{item}> <http://purl.org/dc/terms/title> "{title}" .
 }}"""
 
-    r = httpclient.patch(container, data=update_data, headers=headers)
+    r = solid_client.patch(provider, profile, container, data=update_data, headers=type_headers)
     r.raise_for_status()
     print(r.text)
     print(f"Status: {r.status_code}")
@@ -495,8 +483,7 @@ def container_exists(solid_client: client.SolidClient, provider: str, profile: s
     """
     uri = _with_trailing_slash(container_uri)
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, uri, "HEAD")
-        r = httpclient.head(uri, headers=headers)
+        r = solid_client.head(provider, profile, uri)
         if r.status_code == 404:
             return False
         if r.ok:
@@ -505,9 +492,7 @@ def container_exists(solid_client: client.SolidClient, provider: str, profile: s
         pass
 
     try:
-        headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
-        headers.update({"Accept": "text/turtle"})
-        r = httpclient.get(uri, headers=headers)
+        r = solid_client.get(provider, profile, uri, headers={"Accept": "text/turtle"})
         if r.status_code == 404:
             return False
         if r.ok:
@@ -581,7 +566,7 @@ def upload_file_to_pod(
     """
     print(f"Uploading file {local_file_path} to {remote_uri}")
 
-    headers = solid_client.get_bearer_for_user(provider, profile, remote_uri, "PUT")
+    headers = {}
 
     # Read file content
     with open(local_file_path, "rb") as f:
@@ -592,7 +577,7 @@ def upload_file_to_pod(
     if content_type:
         headers["content-type"] = content_type
 
-    r = httpclient.put(remote_uri, data=content, headers=headers)
+    r = solid_client.put(provider, profile, remote_uri, data=content, headers=headers)
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -607,10 +592,10 @@ def upload_file_to_pod(
 
 def get_pod_response(solid_client, provider, profile, uri, accept=None):
     """Fetch an authenticated resource using the HTTP client's default redirect handling."""
-    headers = solid_client.get_bearer_for_user(provider, profile, uri, "GET")
+    headers = {}
     if accept:
         headers["Accept"] = accept
-    response = httpclient.get(uri, headers=headers)
+    response = solid_client.get(provider, profile, uri, headers=headers)
     response.raise_for_status()
     return response
 
@@ -635,7 +620,6 @@ def save_resource_from_pod(solid_client, provider, profile, uri, destination, *,
 
 def create_clara_container(solid_client, provider, profile, storage):
     clara_container = os.path.join(storage, CLARA_CONTAINER_NAME)
-    headers = solid_client.get_bearer_for_user(provider, profile, clara_container, "PUT")
     container_payload = {
         "@type": [
             "http://www.w3.org/ns/ldp#BasicContainer",
@@ -645,8 +629,7 @@ def create_clara_container(solid_client, provider, profile, storage):
         "@id": clara_container,
     }
     type_headers = {"Accept": "application/ld+json", "content-type": "application/ld+json"}
-    headers.update(type_headers)
-    r = httpclient.put(clara_container, data=json.dumps(container_payload), headers=headers)
+    r = solid_client.put(provider, profile, clara_container, data=json.dumps(container_payload), headers=type_headers)
     if r.status_code == 201:
         print("Successfully created")
     else:
@@ -660,7 +643,7 @@ def lookup_provider_from_profile(profile_url: str):
     :return:
     """
 
-    r = httpclient.options(profile_url)
+    r = httpclient.HttpClient().options(profile_url)
     r.raise_for_status()
     links = r.headers.get("Link")
     if links:
@@ -702,10 +685,10 @@ def get_title_from_mei(payload, filename):
 def upload_mei_to_pod(solid_client, provider, profile, storage, payload):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "mei", str(uuid.uuid4()) + ".mei")
     print(f"Uploading file {resource}")
-    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
     # TODO: Should this be an XML mimetype, or a specific MEI one?
-    headers["content-type"] = "application/xml"
-    r = httpclient.put(resource, data=payload.encode("utf-8"), headers=headers)
+    r = solid_client.put(
+        provider, profile, resource, data=payload.encode("utf-8"), headers={"content-type": "application/xml"}
+    )
     r.raise_for_status()
     print(r.text)
     return resource
@@ -715,9 +698,7 @@ def upload_webmidi_to_pod(solid_client, provider, profile, storage, payload: byt
     # TODO: This duplicates many other methods, could be simplified
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "webmidi", str(uuid.uuid4()) + ".json")
     print(f"Uploading webmidi file to {resource}")
-    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
-    headers["content-type"] = "application/json"
-    r = httpclient.put(resource, data=payload, headers=headers)
+    r = solid_client.put(provider, profile, resource, data=payload, headers={"content-type": "application/json"})
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -726,9 +707,7 @@ def upload_webmidi_to_pod(solid_client, provider, profile, storage, payload: byt
 def upload_midi_to_pod(solid_client, provider, profile, storage, payload: bytes):
     resource = os.path.join(storage, CLARA_CONTAINER_NAME, "midi", str(uuid.uuid4()) + ".mid")
     print(f"Uploading midi file to {resource}")
-    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
-    headers["content-type"] = "audio/midi"
-    r = httpclient.put(resource, data=payload, headers=headers)
+    r = solid_client.put(provider, profile, resource, data=payload, headers={"content-type": "audio/midi"})
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -736,9 +715,7 @@ def upload_midi_to_pod(solid_client, provider, profile, storage, payload: bytes)
 
 def upload_mp3_to_pod(solid_client, provider, profile, resource, payload: bytes):
     print(f"Uploading mp3 file to {resource}")
-    headers = solid_client.get_bearer_for_user(provider, profile, resource, "PUT")
-    headers["content-type"] = "audio/mpeg"
-    r = httpclient.put(resource, data=payload, headers=headers)
+    r = solid_client.put(provider, profile, resource, data=payload, headers={"content-type": "audio/mpeg"})
     r.raise_for_status()
     print("status:", r.text)
     return resource
@@ -1032,9 +1009,9 @@ def create_and_save_structure(
     create_ldp_container(solid_client, provider, profile, timeline_resource, timeout=10)
 
     print("Making score:", score_resource)
-    headers = solid_client.get_bearer_for_user(provider, profile, score_resource, "PUT")
-    headers["content-type"] = "text/turtle"
-    r = httpclient.put(score_resource, data=score_data, headers=headers, timeout=10)
+    r = solid_client.put(
+        provider, profile, score_resource, data=score_data, headers={"content-type": "text/turtle"}, timeout=10
+    )
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -1045,9 +1022,9 @@ def create_and_save_structure(
     print(r.text)
 
     print("Making segment:", segment_resource)
-    headers = solid_client.get_bearer_for_user(provider, profile, segment_resource, "PUT")
-    headers["content-type"] = "text/turtle"
-    r = httpclient.put(segment_resource, data=segmentation_data, headers=headers, timeout=10)
+    r = solid_client.put(
+        provider, profile, segment_resource, data=segmentation_data, headers={"content-type": "text/turtle"}, timeout=10
+    )
     try:
         r.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -1069,33 +1046,11 @@ def create_and_save_structure(
     return score_resource
 
 
-def get_uri_jsonld_or_none(uri, headers=None):
-    try:
-        return get_uri_jsonld(uri, headers)
-    except requests.exceptions.HTTPError as e:
-        print("Error", e)
-        if e.response is not None:
-            print(" message:", e.response.text)
-        return None, None
-
-
-def get_uri_jsonld(uri, headers=None):
-    if not headers:
-        headers = {}
-    headers.update({"Accept": "application/ld+json"})
-    r = httpclient.get(uri, headers=headers)
-    r.raise_for_status()
-    logger.debug("Get json-ld from %s", uri)
-    logger.debug("json-ld headers: %s", r.headers)
-    logger.debug("json-ld content: %s", json.dumps(r.json(), indent=2))
-    return r.json(), r.headers
-
-
 def get_uri_ttl(uri, headers=None):
     if not headers:
         headers = {}
     headers.update({"Accept": "text/turtle"})
-    r = httpclient.get(uri, headers=headers)
+    r = httpclient.HttpClient().get(uri, headers=headers)
     r.raise_for_status()
     return r.text
 
@@ -1113,18 +1068,20 @@ def get_storage_from_profile(profile_uri):
 
 def save_performance_manifest(solid_client, provider, profile, performance_uri, manifest):
     print(f"Uploading manifest to {performance_uri}")
-    headers = solid_client.get_bearer_for_user(provider, profile, performance_uri, "PUT")
-    headers["content-type"] = "text/turtle"
-    r = httpclient.put(performance_uri, data=manifest, headers=headers)
+    r = solid_client.put(provider, profile, performance_uri, data=manifest, headers={"content-type": "text/turtle"})
     r.raise_for_status()
     print("save_performance_manifest status:", r.text)
 
 
 def save_performance_timeline(solid_client, provider, profile, timeline_uri, timeline):
     print(f"Uploading timeline to {timeline_uri}")
-    headers = solid_client.get_bearer_for_user(provider, profile, timeline_uri, "PUT")
-    headers["content-type"] = "application/ld+json"
-    r = httpclient.put(timeline_uri, data=json.dumps(timeline).encode("utf-8"), headers=headers)
+    r = solid_client.put(
+        provider,
+        profile,
+        timeline_uri,
+        data=json.dumps(timeline).encode("utf-8"),
+        headers={"content-type": "application/ld+json"},
+    )
     r.raise_for_status()
     print("save_performance_timeline status:", r.text)
 

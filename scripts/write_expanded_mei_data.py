@@ -34,6 +34,6 @@ if __name__ == "__main__":
         with open(meiFile, "r") as f:
             data = f.read()
     else:
-        resp = httpclient.get(meiUri)
+        resp = httpclient.HttpClient().get(meiUri)
         data = resp.text
     write_expanded_mei_data(data, output, args.expansion)

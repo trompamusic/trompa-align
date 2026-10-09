@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 from dataclasses import asdict, is_dataclass
 from logging.config import dictConfig
@@ -79,6 +80,14 @@ def create_app():
     app = flask.Flask(__name__, static_folder="/clara/static")
     app.config.from_pyfile("../config.py")
     httpclient.set_user_agent(f"CLARA/1.0 (+{app.config['BASE_URL']})")
+    httpclient.reset_rate_limits()
+    rate = app.config["RATE_LIMIT_DEFAULT"]
+    httpclient.set_default_rate_limit(rate.limit, rate.period)
+    for host, rate in app.config["RATE_LIMITS"].items():
+        try:
+            httpclient.set_rate_limit(host, rate.limit, rate.period)
+        except ValueError as exc:
+            raise ValueError(f"Invalid TR_ALIGN_RATE_LIMITS: {host!r}: {exc}") from exc
     extensions.db.init_app(app)
     extensions.backend.init_app(app)
     extensions.cors.init_app(app)
@@ -240,6 +249,9 @@ def check_user_perms():
         has_permission = True
     except (client.NoSuchAuthenticationError, client.BadClientIdError):
         has_permission = False
+    except client.TokenRefreshRateLimited as exc:
+        headers = {} if exc.retry_after is None else {"Retry-After": str(math.ceil(exc.retry_after))}
+        return jsonify({"error": "token_refresh_rate_limited"}), 503, headers
     except client.TokenRefreshFailed:
         has_permission = False
         # Token refresh failed, so we should delete the authentication and force the user to re-authenticate.

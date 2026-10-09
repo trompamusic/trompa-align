@@ -82,7 +82,7 @@ def perform_workflow(
         with open(mei_file, "r") as f:
             mei_data = f.read()
     else:
-        resp = httpclient.get(mei_uri)
+        resp = httpclient.HttpClient().get(mei_uri)
         mei_data = resp.text
         with open(os.path.join(tempdir, "score.mei"), "w") as out:
             out.write(mei_data)

@@ -33,6 +33,6 @@ if __name__ == "__main__":
         with open(meiFile, "r") as f:
             data = f.read()
     else:
-        resp = httpclient.get(meiUri)
+        resp = httpclient.HttpClient().get(meiUri)
         data = resp.text
     mei_to_midi(data, output, args.expansion)

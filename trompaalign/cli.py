@@ -292,7 +292,7 @@ def cmd_upload_score_to_pod(profile, url, file, title):
     else:
         print(f"Downloading file from {url}")
         filename = os.path.basename(url)
-        r = httpclient.get(url)
+        r = httpclient.HttpClient().get(url)
         r.raise_for_status()
         payload = r.text
 
@@ -366,9 +366,7 @@ def add_turtle(profile, resource, file):
         payload = fp.read()
     print(f"Uploading file {resource}")
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
-    headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
-    headers["content-type"] = "text/turtle"
-    r = httpclient.put(resource, data=payload, headers=headers)
+    r = cl.put(provider, profile, resource, data=payload, headers={"content-type": "text/turtle"})
     print(r.text)
 
 
@@ -391,9 +389,7 @@ def add_jsonld(profile, resource, file):
         payload = fp.read()
     print(f"Uploading file {resource}")
     cl = client.SolidClient(backend.backend, client_id_document_url=current_app.config["CLIENT_ID_DOCUMENT_URL"])
-    headers = cl.get_bearer_for_user(provider, profile, resource, "PUT")
-    headers["content-type"] = "application/ld+json"
-    r = httpclient.put(resource, data=payload, headers=headers)
+    r = cl.put(provider, profile, resource, data=payload, headers={"content-type": "application/ld+json"})
     print(r.text)
 
 

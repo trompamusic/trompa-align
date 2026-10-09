@@ -1,6 +1,7 @@
 import os
 
 from celery.schedules import crontab
+from solidauth.httpclient import RateLimit
 
 
 def require_env(name: str) -> str:
@@ -16,6 +17,24 @@ def require_env(name: str) -> str:
 
 
 REDIS_URL = os.getenv("TR_ALIGN_REDIS_URL")
+
+
+def parse_rate_limit(value: str, setting: str) -> RateLimit:
+    try:
+        limit, period = value.split("/")
+        return RateLimit(int(limit), float(period))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid {setting}: expected positive limit/period, got {value!r}") from exc
+
+
+RATE_LIMIT_DEFAULT = parse_rate_limit(os.getenv("TR_ALIGN_RATE_LIMIT_DEFAULT", "40/10"), "TR_ALIGN_RATE_LIMIT_DEFAULT")
+RATE_LIMITS = {}
+for rule in filter(None, os.getenv("TR_ALIGN_RATE_LIMITS", "").split(",")):
+    try:
+        host, value = rule.split("=")
+    except ValueError as exc:
+        raise ValueError(f"Invalid TR_ALIGN_RATE_LIMITS: expected host-suffix=limit/period, got {rule!r}") from exc
+    RATE_LIMITS[host.strip()] = parse_rate_limit(value, "TR_ALIGN_RATE_LIMITS")
 
 SECRET_KEY = os.getenv("TR_ALIGN_SECRET_KEY")
 SQLALCHEMY_DATABASE_URI = os.getenv("TR_ALIGN_SQLALCHEMY_DATABASE_URI")

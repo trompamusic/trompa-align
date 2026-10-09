@@ -85,6 +85,8 @@ def refresh_all_authentication_tokens():
             logger.info(" ... done")
         except client.NoSuchAuthenticationError:
             logger.info("Authentication no longer exists for %s with client %s", webid, client_id)
+        except client.TokenRefreshRateLimited as exc:
+            logger.warning("Token refresh deferred for %s with client %s: %s", webid, client_id, exc)
         except client.TokenRefreshFailed:
             logger.error("Token refresh failed for %s with client %s, deleting", webid, client_id)
             backend.backend.delete_token_response(provider, webid, client_id)
@@ -141,7 +143,7 @@ def add_score(profile, mei_external_uri):
         pass
 
     try:
-        r = httpclient.get(mei_external_uri, timeout=10)
+        r = httpclient.HttpClient().get(mei_external_uri, timeout=10)
         r.raise_for_status()
         mei_text = r.text
     except requests.exceptions.RequestException as e:
