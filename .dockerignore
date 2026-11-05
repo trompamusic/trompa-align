@@ -1,0 +1,22 @@
+# The Dockerfile copies the whole directory into the image (COPY . /code),
+# so keep secrets, local data and development leftovers out of the build context.
+
+# Environment files with secrets; compose passes these to the containers with env_file
+.env
+env
+env.docker
+mdw-environment
+production-environment
+celery-environment
+
+# Postgres data directory used by compose.mdw.yaml
+pgdata
+
+# Development state
+.git
+.venv
+.root-home
+.idea
+.pytest_cache
+.ruff_cache
+**/__pycache__
