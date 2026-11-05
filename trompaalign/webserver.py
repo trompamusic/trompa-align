@@ -1,6 +1,5 @@
 import logging
 import math
-import os
 from dataclasses import asdict, is_dataclass
 from logging.config import dictConfig
 
@@ -14,6 +13,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from solidauth import client, httpclient
 from solidauth.solid import ProviderConfigurationError
+from werkzeug.exceptions import NotFound
 
 from trompaalign import (
     celery_serializers,  # noqa: F401
@@ -29,6 +29,9 @@ from trompaalign.solid import (
 )
 
 logger = logging.getLogger(__name__)
+
+# The built clara frontend, copied here by the production Dockerfile stage
+CLARA_BUILD_DIRECTORY = "/clara"
 
 
 def celery_init_app(app: flask.Flask) -> Celery:
@@ -77,7 +80,7 @@ def configure_logging():
 
 def create_app():
     configure_logging()
-    app = flask.Flask(__name__, static_folder="/clara/static")
+    app = flask.Flask(__name__, static_folder=f"{CLARA_BUILD_DIRECTORY}/static")
     app.config.from_pyfile("../config.py")
     httpclient.set_user_agent(f"CLARA/1.0 (+{app.config['BASE_URL']})")
     httpclient.reset_rate_limits()
@@ -384,12 +387,9 @@ def align_status():
 @webserver_bp.route("/", defaults={"path": "index.html"})
 @webserver_bp.route("/<path:path>")
 def catch_all(path):
-    if "/" not in path:
-        user_path = ""
-        user_file = path
-    else:
-        user_path, user_file = path.rsplit("/", 1)
-    if os.path.exists(os.path.join(os.path.join("/clara", user_path), user_file)):
-        return flask.send_from_directory(os.path.join("/clara", user_path), user_file)
-    else:
-        return flask.send_from_directory("/clara", "index.html")
+    # send_from_directory refuses paths that resolve outside the directory (e.g. "..%2F"),
+    # so anything that isn't a file in the clara build gets the app's index.html
+    try:
+        return flask.send_from_directory(CLARA_BUILD_DIRECTORY, path)
+    except NotFound:
+        return flask.send_from_directory(CLARA_BUILD_DIRECTORY, "index.html")
