@@ -2,3 +2,9 @@
 env
 .env
 __pycache__
+env.docker
+mdw-environment
+production-environment
+celery-environment
+pgdata/
+.root-home/
